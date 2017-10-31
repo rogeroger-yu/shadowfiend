@@ -1,0 +1,11 @@
+Generic single-database configuration.
+To create alembic migrations use:
+$ shadowfiend-db-manage revision --message "description of revision" --autogenerate
+
+Stamp db with most recent migration version, without actually running migrations
+$ shadowfiend-db-manage stamp head
+
+Upgrade can be performed by:
+$ shadowfiend-db-manage upgrade
+$ shadowfiend-db-manage upgrade head
+
