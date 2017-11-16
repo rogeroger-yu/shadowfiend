@@ -1,15 +1,27 @@
+# -*- coding: utf-8 -*-
+# Copyright 2017 Openstack Foundation.
+#
+#    Licensed under the Apache License, Version 2.0 (the "License"); you may
+#    not use this file except in compliance with the License. You may obtain
+#    a copy of the License at
+#
+#         http://www.apache.org/licenses/LICENSE-2.0
+#
+#    Unless required by applicable law or agreed to in writing, software
+#    distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+#    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+#    License for the specific language governing permissions and limitations
+#    under the License.
 import datetime
 
 import pecan
 from pecan import rest
-from pecan import request
-import wsme
 from wsme import types as wtypes
 from wsmeext.pecan import wsexpose
 from oslo_config import cfg
 from oslo_log import log as logging
 
-#from shadowfiend.policy import check_policy
+from shadowfiend.common import policy
 #from shadowfiend import exception
 #from shadowfiend import utils as gringutils
 from shadowfiend.api.controllers.v1 import models
@@ -21,9 +33,9 @@ from shadowfiend.conductor import api as conductor_api
 
 
 LOG = logging.getLogger(__name__)
+HOOK = pecan.request
 
-
-class AccountController(rest.RestController):
+class ExistAccountController(rest.RestController):
     """Manages operations on account."""
 
     _custom_actions = {
@@ -33,57 +45,401 @@ class AccountController(rest.RestController):
         'estimate_per_day': ['GET'],
     }
 
-    #def __init__(self, user_id):
-    #    self._id = user_id
+    def __init__(self, user_id):
+        self._id = user_id
 
-    #@wsexpose(models.UserAccount, int)
-    @wsexpose(None, int)
-    def level(self, level):
-        """Update the account's level."""
-        account = pecan.request.processor_rpcapi.update_level()
-        return "test level"
-
-    #@wsexpose(models.Charges, wtypes.text, datetime.datetime,
-    @wsexpose(models.Test)
-    def charges(self, type=None, start_time=None,
-                end_time=None, limit=None, offset=None):
-        """Get this account's charge records."""
-        #test_text = pecan.request.conductor_rpcapi.test()
-        test_text = pecan.request.processor_rpcapi.test()
-        return models.Test(test_text=test_text)
-
-    @wsexpose(int)
-    def estimate(self):
-        """Estimate the hourly billing resources how many days to owed.
-        """
-
-    #@wsexpose(models.Estimate)
-    @wsexpose(None)
-    def estimate_per_day(self):
-        """Get the price per day and the remaining days that the
-        balance can support.
-        """
-
-    @wsexpose(None)
-    def delete(self):
-        """Delete the account including the projects that belong to it."""
-
-    #@wsexpose(None, body=models.AdminAccount)
-    @wsexpose(None, body=None)
-    def post(self, data):
-        """Create a new account."""
+    def _account(self, user_id=None):
+        _id = user_id or self._id
+        try:
+            account = HOOK.conductor_rpcapi.get_account(request.context,
+                                                        _id)
+        except exception.AccountNotFound:
+            LOG.error("Account %s not found" % _id)
+            raise
+        except exception.GetExternalBalanceFailed:
+            raise
+        except (Exception):
+            LOG.error("Fail to get account %s" % _id)
+            raise exception.AccountGetFailed(user_id=_id)
+        return account
 
     #@wsexpose(models.Charge, wtypes.text, body=models.Charge)
     @wsexpose(None, wtypes.text, body=None)
     def put(self, data):
         """Charge the account."""
+        check_policy(request.context, "account:charge")
 
-    #@wsexpose(models.UserAccount)
-    @wsexpose(None)
-    def get_one(self):
-        """Get this account."""
+        # check uos_bill_account_charge_limited charge value
+        if "uos_bill_account_charge_limited" in request.context.roles:
+            lscv = int(cfg.CONF.limited_support_charge_value)
+            if data.value < -lscv or data.value > lscv:
+                raise exception.InvalidChargeValue(value=data.value)
+        else:  # check accountant charge value
+            lacv = int(cfg.CONF.limited_accountant_charge_value)
+            if data.value < -lacv or data.value > lacv:
+                raise exception.InvalidChargeValue(value=data.value)
 
-    #@wsexpose(models.UserAccount)
-    @wsexpose(None)
-    def get_all(self):
+        remarks = data.remarks if data.remarks != wsme.Unset else None
+        operator = request.context.user_id
+
+        try:
+            charge, is_first_charge = HOOK.conductor_rpcapi.\
+                    update_account(request.context,
+                                   self._id,
+                                   operator=operator,
+                                   **data.as_dict())
+            has_bonus = False
+            if cfg.CONF.enable_bonus and data['type'] != 'bonus':
+                value = gringutils.calculate_bonus(data['value'])
+                if value > 0:
+                    bonus, _ = HOOK.conductor_rpcapi.\
+                            update_account(request.context,
+                                           self._id,
+                                           type='bonus',
+                                           value=value,
+                                           come_from='system',
+                                           operator=operator,
+                                           remarks=remarks)
+                    has_bonus = True
+
+            if cfg.CONF.enable_invitation and is_first_charge:
+                _account = self._account()
+                min_charge_value = gringutils._quantize_decimal(
+                    cfg.CONF.min_charge_value)
+                reward_value = gringutils._quantize_decimal(
+                    cfg.CONF.reward_value)
+
+                if _account.inviter \
+                        and data.value >= min_charge_value \
+                        and reward_value > 0:
+                    remarks = "reward because of invitation"
+                    HOOK.conductor_rpcapi.update_account(request.context,
+                                                         _account.inviter,
+                                                         type='bonus',
+                                                         value=reward_value,
+                                                         come_from='system',
+                                                         operator=operator,
+                                                         remarks=remarks,
+                                                         invitee=self._id)
+                    if cfg.CONF.notify_account_charged:
+                        inviter = HOOK.conductor_rpcapi.\
+                                get_account(request.context,
+                                            _account.inviter).as_dict()
+                        contact = kunkka.get_uos_user(inviter['user_id'])
+                        self.notifier = notifier.NotifierService(
+                            cfg.CONF.checker.notifier_level)
+                        self.notifier.notify_account_charged(
+                            request.context, inviter, contact,
+                            'bonus', reward_value, bonus=0,
+                            operator=operator,
+                            operator_name=request.context.user_name,
+                            remarks="reward because of invitation")
+            HOOK.conductor_rpcapi.set_charged_orders(request.context, self._id)
+        except exception.NotAuthorized as e:
+            LOG.exception('Fail to charge the account:%s '
+                          'due to not authorization' % self._id)
+            raise exception.NotAuthorized()
+        except Exception as e:
+            LOG.exception('Fail to charge the account:%s, '
+                          'charge value: %s' % (self._id, data.value))
+            raise exception.DBError(reason=e)
+        else:
+            # Notifier account
+            if cfg.CONF.notify_account_charged:
+                account = HOOK.conductor_rpcapi.get_account(request.context,
+                                                            self._id).as_dict()
+                contact = kunkka.get_uos_user(account['user_id'])
+                language = cfg.CONF.notification_language
+                self.notifier = notifier.NotifierService(
+                    cfg.CONF.checker.notifier_level)
+                self.notifier.notify_account_charged(
+                    request.context, account, contact,
+                    data['type'], charge.value,
+                    bonus=bonus.value if has_bonus else 0,
+                    operator=operator,
+                    operator_name=request.context.user_name,
+                    remarks=remarks, language=language)
+        return models.Charge.from_db_model(charge)
+
+    @wsexpose(models.UserAccount)
+    def get(self):
         """Get this account."""
+        user_id = acl.get_limited_to_user(
+            request.headers, 'account_get') or self.id
+        return models.UserAccount.from_db_model(self._account(user_id=user_id))
+
+    @wsexpose(None)
+    def delete(self):
+        """Delete the account including the projects that belong to it."""
+        policy.check_policy(HOOK.context, "account:delete")
+        try:
+            repsonse = HOOK.conductor_rpcapi.delete_account(**data.as_dict())
+            return response
+        except (exception.NotFound):
+            msg = _('Could not find account whose user_id is %s' % self._id)
+        except Exception:
+            LOG.exception('Fail to create account: %s' % data.as_dict())
+
+    #@wsexpose(models.UserAccount, int)
+    @wsexpose(None, int)
+    def level(self, level):
+        """Update the account's level."""
+        check_policy(request.context, "account:level")
+
+        if not isinstance(level, int) or level < 0 or level > 9:
+            raise exception.InvalidParameterValue(err="Invalid Level")
+        try:
+            account = HOOK.conductor_rpcapi.change_account_level(
+                request.context, self._id, level)
+        except Exception as e:
+            LOG.exception('Fail to change the account level of: %s' % self._id)
+            raise exception.DBError(reason=e)
+
+        return models.UserAccount.from_db_model(account)
+
+    @wsexpose(models.Charges, wtypes.text, datetime.datetime,
+              datetime.datetime, int, int)
+    def charges(self, type=None, start_time=None,
+                end_time=None, limit=None, offset=None):
+        """Get this account's charge records."""
+
+        if limit and limit < 0:
+            raise exception.InvalidParameterValue(err="Invalid limit")
+        if offset and offset < 0:
+            raise exception.InvalidParameterValue(err="Invalid offset")
+
+        user_id = acl.get_limited_to_user(
+            request.headers, 'account_charge') or self._id
+
+        charges = HOOK.conductor_rpcapi.get_charges(request.context,
+                                                     user_id=user_id,
+                                                     type=type,
+                                                     limit=limit,
+                                                     offset=offset,
+                                                     start_time=start_time,
+                                                     end_time=end_time)
+        charges_list = []
+        for charge in charges:
+            charges_list.append(models.Charge.from_db_model(charge))
+
+        total_price, total_count = HOOK.conductor_rpcapi.\
+                get_charges_price_and_count(request.context,
+                                            user_id=user_id,
+                                            type=type,
+                                            start_time=start_time,
+                                            end_time=end_time)
+        total_price = gringutils._quantize_decimal(total_price)
+
+        return models.Charges.transform(total_price=total_price,
+                                        total_count=total_count,
+                                        charges=charges_list)
+
+    @wsexpose(int)
+    def estimate(self):
+        """Estimate the hourly billing resources how many days to owed.
+        """
+        if not cfg.CONF.enable_owe:
+            return -1
+
+        user_id = acl.get_limited_to_user(
+            request.headers, 'account_estimate') or self._id
+
+        account = self._account(user_id=user_id)
+        if account.balance < 0:
+            return -2
+
+        orders = HOOK.conductor_rpcapi.get_active_orders(request.context,
+                                                         user_id=user_id,
+                                                         within_one_hour=True,
+                                                         bill_methods=['hour'])
+        if not orders:
+            return -1
+
+        price_per_hour = 0
+        for order in orders:
+            price_per_hour += gringutils._quantize_decimal(order.unit_price)
+
+        if price_per_hour == 0:
+            return -1
+
+        price_per_day = price_per_hour * 24
+        days_to_owe_d = float(account.balance / price_per_day)
+        days_to_owe = round(days_to_owe_d)
+        if days_to_owe < days_to_owe_d:
+            days_to_owe = days_to_owe + 1
+        if days_to_owe > 7:
+            return -1
+        return days_to_owe
+
+    @wsexpose(models.Estimate)
+    def estimate_per_day(self):
+        """Get the price per day and the remaining days that the
+        balance can support.
+        """
+        user_id = acl.get_limited_to_user(
+            request.headers, 'account_estimate') or self._id
+
+        account = self._account(user_id=user_id)
+        orders = HOOK.conductor_rpcapi.get_active_orders(request.context,
+                                                         user_id=user_id,
+                                                         within_one_hour=True,
+                                                         bill_methods=['hour'])
+        price_per_day = gringutils._quantize_decimal(0)
+        if not orders:
+            if account.balance < 0:
+                return (price_per_day, -2)
+            else:
+                return (price_per_day, -1)
+
+        price_per_hour = 0
+        for order in orders:
+            price_per_hour += gringutils._quantize_decimal(order.unit_price)
+
+        if price_per_hour == 0:
+            if account.balance < 0:
+                return (price_per_day, -2)
+            else:
+                return (price_per_day, -1)
+        elif price_per_hour > 0:
+            if account.balance < 0:
+                return (price_per_day, -2)
+            else:
+                price_per_day = price_per_hour * 24
+                remaining_day = int(account.balance / price_per_day)
+
+        return models.Estimate(price_per_day=price_per_day,
+                               remaining_day=remaining_day)
+
+
+class ChargeController(rest.RestController):
+
+    @wsexpose(models.Charges, wtypes.text, wtypes.text,
+              datetime.datetime, datetime.datetime, int, int,
+              wtypes.text, wtypes.text)
+    def get(self, user_id=None, type=None, start_time=None,
+            end_time=None, limit=None, offset=None,
+           sort_key='created_at', sort_dir='desc'):
+        """Get all charges of all account."""
+
+        check_policy(request.context, "charges:all")
+
+        if limit and limit < 0:
+            raise exception.InvalidParameterValue(err="Invalid limit")
+        if offset and offset < 0:
+            raise exception.InvalidParameterValue(err="Invalid offset")
+
+        users = {}
+
+        def _get_user(user_id):
+            user = users.get(user_id)
+            if user:
+                return user
+            contact = kunkka.get_uos_user(user_id) or {}
+            user_name = contact.get('name')
+            email = contact.get('email')
+            real_name = contact.get('real_name')
+            mobile = contact.get('phone')
+            company = contact.get('company')
+            users[user_id] = models.User(user_id=user_id,
+                                         user_name=user_name,
+                                         email=email,
+                                         real_name=real_name,
+                                         mobile=mobile,
+                                         company=company)
+            return users[user_id]
+
+        charges = HOOK.conductor_rpcapi.get_charges(request.context,
+                                                    user_id=user_id,
+                                                    type=type,
+                                                    limit=limit,
+                                                    offset=offset,
+                                                    start_time=start_time,
+                                                    end_time=end_time,
+                                                    sort_key=sort_key,
+                                                    sort_dir=sort_dir)
+        charges_list = []
+        for charge in charges:
+            acharge = models.Charge.from_db_model(charge)
+            acharge.actor = _get_user(charge.operator)
+            acharge.target = _get_user(charge.user_id)
+            charges_list.append(acharge)
+
+        total_price, total_count = HOOK.conductor_rpcapi.\
+                get_charges_price_and_count(request.context,
+                                            user_id=user_id,
+                                            type=type,
+                                            start_time=start_time,
+                                            end_time=end_time)
+        total_price = gringutils._quantize_decimal(total_price)
+
+        return models.Charges.transform(total_price=total_price,
+                                        total_count=total_count,
+                                        charges=charges_list)
+
+
+class TransferMoneyController(rest.RestController):
+
+    @wsexpose(None, body=models.TransferMoneyBody)
+    def post(self, data):
+        """Transfer money from one account to another.
+        And only the domain owner can do the operation.
+        """
+        is_domain_owner = acl.context_is_domain_owner(request.headers)
+        if not is_domain_owner:
+            raise exception.NotAuthorized()
+
+        HOOK.conductor_rpcapi.transfer_money(request.context, data)
+
+
+class AccountController(rest.RestController):
+    """Manages operations on account."""
+
+    charges = ChargeController()
+    transfer = TransferMoneyController()
+
+    @pecan.expose()
+    def _lookup(self, user_id, *remainder):
+        if remainder and not remainder[-1]:
+            remainder = remainder[:-1]
+        _correct = len(user_id) == 32 or len(user_id) == 64
+        if _correct:
+            return ExistAccountController(user_id), remainder
+
+    #@wsexpose(None, body=models.AdminAccount)
+    @wsexpose(None, body=models.AdminAccount)
+    def post(self, data):
+        """Create a new account."""
+        policy.check_policy(HOOK.context, "account:post")
+        try:
+            repsonse = HOOK.conductor_rpcapi.create_account(**data.as_dict())
+            return response
+        except Exception:
+            LOG.exception('Fail to create account: %s' % data.as_dict())
+
+    @wsexpose(models.UserAccount, bool, int, int, wtypes.text)
+    def get_all(self, owed=None, limit=None, offset=None):
+        """Get this account."""
+        policy.check_policy(HOOK.context, "account:all")
+
+        if limit and limit < 0:
+            raise exception.InvalidParameterValue(err="Invalid limit")
+        if offset and offset < 0:
+            raise exception.InvalidParameterValue(err="Invalid offset")
+
+        try:
+            accounts = HOOK.conductor_rpcapi.get_accounts(**data.as_dict())
+            count = HOOK.conductor_rpcapi.get_accounts_count(**data.as_dict())
+        except exception.NotAuthorized as e:
+            LOG.exception('Failed to get all accounts')
+            raise exception.NotAuthorized()
+        except Exception as e:
+            LOG.exception('Failed to get all accounts')
+            raise exception.DBError(reason=e)
+
+        accounts = [models.AdminAccount.from_db_model(account)
+                    for account in accounts]
+
+        return models.AdminAccounts(total_count=count,
+                                    accounts=accounts)
+
+

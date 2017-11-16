@@ -1,0 +1,4 @@
+{
+    "uos_admin": "role:uos_admin or role:admin",
+    "account:post": ""
+}

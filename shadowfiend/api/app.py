@@ -1,4 +1,18 @@
-import logging
+# -*- coding: utf-8 -*-
+# Copyright 2017 Openstack Foundation.
+#
+#    Licensed under the Apache License, Version 2.0 (the "License"); you may
+#    not use this file except in compliance with the License. You may obtain
+#    a copy of the License at
+#
+#         http://www.apache.org/licenses/LICENSE-2.0
+#
+#    Unless required by applicable law or agreed to in writing, software
+#    distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+#    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+#    License for the specific language governing permissions and limitations
+#    under the License.
+
 import os
 from wsgiref import simple_server
 
@@ -16,7 +30,7 @@ LOG = log.getLogger(__name__)
 
 auth_opts = [
     cfg.StrOpt('api_paste_config',
-               default="/root/yuqian/shadowfiend/etc/api_paste.ini",
+               default="/home/heat-admin/shadowfiend/etc/shadowfiend/api_paste.ini",
                help="Configuration file for WSGI definition of API."
                ),
     cfg.StrOpt('auth_strategy',
@@ -85,7 +99,6 @@ def build_server():
     port = CONF.api.port
     LOG.info(_LI('Starting server in PID %s'), os.getpid())
     LOG.info(_LI("Configuration:"))
-    cfg.CONF.log_opt_values(LOG, logging.INFO)
 
     if host == '0.0.0.0':
         LOG.info(_LI('serving on 0.0.0.0:%(sport)s, view at '

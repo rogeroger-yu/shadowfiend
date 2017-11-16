@@ -1,4 +1,23 @@
+# -*- coding: utf-8 -*-
+# Copyright 2017 Openstack Foundation.
+#
+#    Licensed under the Apache License, Version 2.0 (the "License"); you may
+#    not use this file except in compliance with the License. You may obtain
+#    a copy of the License at
+#
+#         http://www.apache.org/licenses/LICENSE-2.0
+#
+#    Unless required by applicable law or agreed to in writing, software
+#    distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+#    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+#    License for the specific language governing permissions and limitations
+#    under the License.
+
 from oslo_config import cfg
+
+OPT_GROUP = cfg.OptGroup(
+    name='processor',
+    title='Options for the shadowfiend-processor service')
 
 SERVICE_OPTS = [
     cfg.StrOpt('topic',
@@ -13,12 +32,17 @@ SERVICE_OPTS = [
                help=('RPC timeout for the Processor liveness check that is '
                      'used for bay locking.')),
     cfg.IntOpt('process_period',
-               default=3600,
+               default=15,
                help=('process period in seconds.')),
+    cfg.StrOpt('coordination_url',
+               secret=True,
+               help='Coordination driver URL',
+               default='file:///var/lib/shadowfiend/locks'),
+    cfg.IntOpt('cloudkitty_period',
+               default=3600,
+               help=('cloudkitty period in seconds.')),
 ]
 
-opt_group = cfg.OptGroup(
-    name='processor',
-    title='Options for the shadowfiend-processor service')
-cfg.CONF.register_group(opt_group)
-cfg.CONF.register_opts(SERVICE_OPTS, opt_group)
+
+cfg.CONF.register_group(OPT_GROUP)
+cfg.CONF.register_opts(SERVICE_OPTS, 'processor')
