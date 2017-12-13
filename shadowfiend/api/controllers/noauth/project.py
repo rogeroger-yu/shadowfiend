@@ -55,7 +55,7 @@ class ExistProjectController(rest.RestController):
     @wsexpose(models.Project)
     def get(self):
         """Return this project."""
-        return models.Project.from_db_model(self._project())
+        return db_models.Project(**self._project())
 
 
 class ProjectController(rest.RestController):

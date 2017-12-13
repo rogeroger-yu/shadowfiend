@@ -118,7 +118,6 @@ class ProcessorPeriodTasks(periodic_task.PeriodicTasks):
         tenants = self.keystone_fetcher.get_rate_tenants()
         LOG.info("Tenants are %s" % str(tenants))
 
-        import pdb;pdb.set_trace()
         #-----------------cinder client test---------------------------
         #self.cinder_fetcher.get_volumes(volume_id='0296d18e-32dc-4ce8-9d37-aa98979128fe')
         #self.nova_fetcher.flavor_list()

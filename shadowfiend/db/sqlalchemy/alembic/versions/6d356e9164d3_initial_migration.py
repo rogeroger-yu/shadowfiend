@@ -18,7 +18,7 @@ def upgrade():
     op.create_table(
         'account',
         sa.Column('id', sa.Integer, primary_key=True),
-        sa.Column('user_id', sa.String(255), index=True),
+        sa.Column('user_id', sa.String(255), index=True, unique=True),
         sa.Column('domain_id', sa.String(255)),
         sa.Column('balance', sa.DECIMAL(20,4)),
         sa.Column('consumption', sa.DECIMAL(20,4)),
@@ -38,7 +38,7 @@ def upgrade():
         'project',
         sa.Column('id', sa.Integer, primary_key=True),
         sa.Column('user_id', sa.String(255), index=True),
-        sa.Column('project_id', sa.String(255), index=True),
+        sa.Column('project_id', sa.String(255), index=True, unique=True),
         sa.Column('consumption', sa.DECIMAL(20,4)),
 
         sa.Column('domain_id', sa.String(255)),
@@ -66,13 +66,13 @@ def upgrade():
         mysql_charset='UTF8'
     )
 
-    #op.create_unique_constraint('uq_usr_prj_relation_id', 'usr_prj_relation', ['user_id', 'project_id'])
+    op.create_unique_constraint('uq_usr_prj_relation_id', 'usr_prj_relation', ['user_id', 'project_id'])
 
     op.create_table(
         'charge',
         sa.Column('id', sa.Integer, primary_key=True),
         sa.Column('charge_id', sa.String(255)),
-        sa.Column('user_id', sa.String(255)),
+        sa.Column('user_id', sa.String(255), unique=True),
         sa.Column('domain_id', sa.String(255)),
         sa.Column('value', sa.DECIMAL(20,4)),
         sa.Column('type', sa.String(64)),
@@ -93,7 +93,7 @@ def upgrade():
         sa.Column('id', sa.Integer, primary_key=True),
 
         sa.Column('order_id', sa.String(255), index=True),
-        sa.Column('resource_id', sa.String(255), index=True),
+        sa.Column('resource_id', sa.String(255), index=True, unique=True),
         sa.Column('resource_name', sa.String(255)),
 
         sa.Column('type', sa.String(255)),

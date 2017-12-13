@@ -14,6 +14,5 @@ class Handler(object):
 
     def create_account(cls, context, **kwargs):
         LOG.debug('create account:Received message from RPC.')
-        import pdb;pdb.set_trace()
         account = db_models.Account(**kwargs)
         return cls.dbapi.create_account(context, account)

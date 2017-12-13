@@ -50,6 +50,13 @@ class Client(object):
                                      project_id)
         return body
 
+    def create_project(self, user_id, project_id, domain_id, consumption):
+        _body = dict(user_id=user_id,
+                     project_id=project_id,
+                     domain_id=domain_id,
+                     consumption=consumption)
+        self.client.post('/projects', body=_body)
+
     def get_order_by_resource_id():
         pass
 

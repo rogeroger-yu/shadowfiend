@@ -410,7 +410,6 @@ class AccountController(rest.RestController):
     def post(self, data):
         """Create a new account."""
         policy.check_policy(HOOK.context, "account:post")
-        import pdb; pdb.set_trace()
         try:
             #account = db_models.Account(**data.as_dict())
             account = data.as_dict()

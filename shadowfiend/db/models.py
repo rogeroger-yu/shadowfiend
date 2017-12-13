@@ -49,7 +49,7 @@ class Product(Model):
     def __init__(self,
                  product_id, name, service, region_id, description,
                  deleted, unit_price, created_at=None, updated_at=None,
-                 deleted_at=None):
+                 deleted_at=None, *args, **kwargs):
         Model.__init__(
             self,
             product_id=product_id,
@@ -86,7 +86,8 @@ class Order(Model):
                  unit_price, unit, total_price, cron_time, date_time,
                  user_id, project_id, region_id, domain_id, owed=None,
                  renew=None, renew_method=None, renew_period=None,
-                 charged=None, created_at=None, updated_at=None):
+                 charged=None, created_at=None, updated_at=None,
+                 *args, **kwargs):
         Model.__init__(
             self,
             order_id=order_id,
@@ -112,82 +113,6 @@ class Order(Model):
             updated_at=updated_at)
 
 
-class Subscription(Model):
-    """The DB Model for Subscription
-
-    :param subscription_id: UUID of the subscription
-    :param type: The type of the subscription, corresponding to resource
-                 status.
-    :param product_id: The product this resource subscribes to
-    :param unit_price: The copy of the product's unit price
-    :param order_id: The order this subscription belongs to
-    :param user_id: The user id this subscription belongs to
-    :param project_id: The project id this subscription belongs to
-    """
-    def __init__(self,
-                 subscription_id, type, product_id, unit_price,
-                 quantity, order_id, user_id, project_id,
-                 region_id, domain_id, created_at=None, updated_at=None):
-        Model.__init__(
-            self,
-            subscription_id=subscription_id,
-            type=type,
-            product_id=product_id,
-            unit_price=unit_price,
-            quantity=quantity,
-            order_id=order_id,
-            user_id=user_id,
-            project_id=project_id,
-            region_id=region_id,
-            domain_id=domain_id,
-            created_at=created_at,
-            updated_at=updated_at,
-        )
-
-
-class Bill(Model):
-    """A detail bill record
-    :param bill_id: The UUID of the bill
-    :param start_time: The start time of the bill
-    :param end_time: The end time of the bill
-    :param type: The type of the bill, equal to the order type
-    :param status: The status of the bill, payed or owed
-    :param unit_price: The unit price of the resource
-    :param unit: The unit of the price
-    :param total_price: The fee between start_time and end_time
-    :param order_id: The order id the bill belongs to
-    :param resource_id: UUID of the resource
-    :param remarks: The remarks of this bill
-    :param user_id: The user id this bill belongs to
-    :param project_id: The project id this bill belongs to
-    """
-
-    def __init__(self,
-                 bill_id, start_time, end_time, type, status, unit_price, unit,
-                 total_price, order_id, resource_id, remarks, user_id,
-                 project_id, region_id, domain_id,
-                 created_at=None, updated_at=None):
-        Model.__init__(
-            self,
-            bill_id=bill_id,
-            start_time=start_time,
-            end_time=end_time,
-            type=type,
-            status=status,
-            unit_price=unit_price,
-            unit=unit,
-            total_price=total_price,
-            order_id=order_id,
-            resource_id=resource_id,
-            remarks=remarks,
-            user_id=user_id,
-            project_id=project_id,
-            region_id=region_id,
-            domain_id=domain_id,
-            created_at=created_at,
-            updated_at=updated_at)
-
-
 class Account(Model):
     """The DB model of user
     :param user_id: The uuid of the user
@@ -199,13 +124,12 @@ class Account(Model):
     def __init__(self,
                  user_id, domain_id, balance, consumption,
                  level, deleted=None, owed=None, created_at=None, updated_at=None,
-                 deleted_at=None, frozen_balance=None):
+                 deleted_at=None, *args, **kwargs):
         Model.__init__(
             self,
             user_id=user_id,
             domain_id=domain_id,
             balance=balance,
-            frozen_balance=frozen_balance,
             consumption=consumption,
             level=level,
             deleted=deleted,
@@ -227,7 +151,8 @@ class Charge(Model):
                  value, charge_time,
                  type=None, come_from=None, trading_number=None,
                  operator=None, remarks=None,
-                 created_at=None, updated_at=None):
+                 created_at=None, updated_at=None,
+                 *args, **kwargs):
         Model.__init__(
             self,
             charge_id=charge_id,
@@ -244,32 +169,9 @@ class Charge(Model):
             updated_at=updated_at)
 
 
-class PreCharge(Model):
-    """The precharge model
-    """
-    def __init__(self, code, price, used, dispatched, deleted,
-                 operator_id, user_id, project_id, domain_id,
-                 created_at=None, deleted_at=None, expired_at=None,
-                 remarks=None):
-        Model.__init__(self,
-                       code=code,
-                       price=price,
-                       used=used,
-                       dispatched=dispatched,
-                       deleted=deleted,
-                       operator_id=operator_id,
-                       user_id=user_id,
-                       project_id=project_id,
-                       domain_id=domain_id,
-                       created_at=created_at,
-                       deleted_at=deleted_at,
-                       expired_at=expired_at,
-                       remarks=remarks)
-
-
 class Project(Model):
     def __init__(self, user_id, project_id, domain_id, consumption,
-                 created_at=None, updated_at=None):
+                 created_at=None, updated_at=None, *args, **kwargs):
         Model.__init__(self,
                        user_id=user_id,
                        project_id=project_id,
@@ -279,26 +181,13 @@ class Project(Model):
                        updated_at=updated_at)
 
 
-class UserProject(Model):
+class UsrPrjRelation(Model):
     def __init__(self, user_id, project_id, user_consumption,
-                 project_consumption, is_historical, created_at):
+                 project_consumption, is_historical, created_at, *args, **kwargs):
         Model.__init__(self,
                        user_id=user_id,
                        project_id=project_id,
                        user_consumption=user_consumption,
                        project_consumption=project_consumption,
                        is_historical=is_historical,
-                       created_at=created_at)
-
-
-class Deduct(Model):
-    def __init__(self, req_id, deduct_id, type, money, remark,
-                 order_id, created_at):
-        Model.__init__(self,
-                       req_id=req_id,
-                       deduct_id=deduct_id,
-                       type=type,
-                       money=money,
-                       remark=remark,
-                       order_id=order_id,
                        created_at=created_at)

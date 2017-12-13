@@ -20,11 +20,15 @@ from wsme import types as wtypes
 
 class APIBase(wtypes.Base):
     def __init__(self, **kw):
-       # for key, value in kw.items():
-       #     if isinstance(value, datetime.datetime):
-       #         #kw[k] = timeutils.isotime(at=value)
-       #         kw[key] = value
+        for key, value in kw.items():
+            if isinstance(value, datetime.datetime):
+                #kw[k] = timeutils.isotime(at=value)
+                kw[key] = value
         super(APIBase, self).__init__(**kw)
+
+    @classmethod
+    def from_db_model(cls, m):
+        return cls(**(m.as_dict()))
 
     def as_dict(self):
         return dict((k.name, getattr(self, k.name))
@@ -54,7 +58,6 @@ class Summaries(APIBase):
 class AdminAccount(APIBase):
     """Account Detail for a tenant"""
     balance = float
-    frozen_balance = float
     consumption = float
     level = int
     user_id = wtypes.text
@@ -85,7 +88,6 @@ class User(APIBase):
 class UserAccount(APIBase):
     balance = float
     consumption = float
-    currency = wtypes.text
     owed = bool
     level = int
 
@@ -147,7 +149,6 @@ class BalanceFrozenResult(APIBase):
     user_id = wtypes.text
     project_id = wtypes.text
     balance = float
-    frozen_balance = float
 
 
 class BalanceFrozenBody(APIBase):

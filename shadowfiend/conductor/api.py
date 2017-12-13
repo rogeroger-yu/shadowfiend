@@ -33,14 +33,20 @@ class API(rpc_service.API):
 
     def change_billing_owner(self, project_id, user_id):
         """"Change billing_owner of this project"""
-        args = {'project_id': project_id,
+        kwargs = {'project_id': project_id,
                 'user_id': user_id}
-        return self._call('change_billing_owner', args=args)
+        return self._call('change_billing_owner', **kwargs)
 
     def get_billing_owner(self, context, project_id):
-        args = {'project_id': project_id}
-        return self._call('get_billing_owner', args=args)
+        kwargs = {'project_id': project_id}
+        return self._call('get_billing_owner', **kwargs)
 
     def create_account(self, context, account):
-        import pdb;pdb.set_trace()
         return self._call('create_account', **account)
+
+    def create_project(self, context, project):
+        return self._call('create_project', **project)
+
+    def get_project(self, context, project_id):
+        kwargs = {'project_id': project_id}
+        return self._call('get_project', **kwargs)

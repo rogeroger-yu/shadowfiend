@@ -21,7 +21,6 @@ class AccountController(rest.RestController):
     @wsexpose(None, body=models.AdminAccount)
     def post(self, data):
         """Create a new account."""
-        import pdb;pdb.set_trace()
         try:
             account = data.as_dict()
             return HOOK.conductor_rpcapi.create_account(HOOK.context,

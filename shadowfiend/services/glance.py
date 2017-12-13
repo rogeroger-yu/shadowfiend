@@ -19,7 +19,6 @@ class GlanceClient(BaseClient):
     def __init__(self):
         super(GlanceClient, self).__init__()
 
-        import pdb;pdb.set_trace()
         self.glance_client = glance_client.Client(
             version='1',
             session=self.session,

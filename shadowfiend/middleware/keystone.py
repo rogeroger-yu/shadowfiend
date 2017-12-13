@@ -84,9 +84,9 @@ class KeystoneBillingProtocol(object):
     def __init__(self, app, conf):
         self.app = app
         self.conf = conf
-        self.position = 2
-        self.user_id_position = 4
-        self.role_id_position = 6
+        self.position = 1
+        self.user_id_position = 3
+        self.role_id_position = 5
 
         self.user_regex = re.compile(
             r"^/%s/%s([.][^.]+)?$" % \
@@ -261,6 +261,7 @@ class KeystoneBillingProtocol(object):
         # the billing owner role to the previous billing owner on the
         # project.
         elif self.add_role_action(request_method, path_info):
+            LOG.warning("---------------add role-------------")
             user_id, project_id, role_id = self.get_role_action_ids(path_info)
             app_result = self.app(env, start_response)
 

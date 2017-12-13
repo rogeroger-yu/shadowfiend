@@ -99,7 +99,7 @@ class Project(Base):
 
 class UsrPrjRelation(Base):
 
-    __tablename__ = 'user_project'
+    __tablename__ = 'usr_prj_relation'
 
     id = Column(Integer, primary_key=True)
     user_id = Column(String(255))

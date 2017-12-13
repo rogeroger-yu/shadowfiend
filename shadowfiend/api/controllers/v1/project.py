@@ -12,6 +12,7 @@ from oslo_log import log
 from shadowfiend.common import exception
 from shadowfiend.api import acl
 from shadowfiend.api.controllers.v1 import models
+from shadowfiend.db import models as db_models
 from shadowfiend.services.keystone import KeystoneClient as ks_client
 
 
@@ -39,8 +40,9 @@ class BillingOwnerController(rest.RestController):
     @wsexpose(models.UserAccount)
     def get(self):
         LOG.info("get_billing_owner")
-        return HOOK.conductor_rpcapi.get_billing_owner(HOOK.context,
-                                                       self.project_id)
+        user_account = HOOK.conductor_rpcapi.get_billing_owner(HOOK.context,
+                                                               self.project_id)
+        return db_models.Account(**user_account)
 
     @wsexpose(models.BalanceFrozenResult, body=models.BalanceFrozenBody)
     def freeze(self, data):
@@ -205,6 +207,7 @@ class ProjectController(rest.RestController):
     @wsexpose(None, body=models.Project)
     def post(self, data):
         """Create a new project."""
+        import pdb;pdb.set_trace()
         try:
             project = data.as_dict()
             return HOOK.conductor_rpcapi.create_project(HOOK.context, project)

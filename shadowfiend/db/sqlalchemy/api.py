@@ -17,6 +17,7 @@ import datetime
 import functools
 import os
 
+from decimal import Decimal
 from oslo_config import cfg
 from oslo_db import api as oslo_db_api
 from oslo_db import exception as db_exc
@@ -141,6 +142,13 @@ class Connection(api.Connection):
             return datetime
 
     @staticmethod
+    def _transfer_decimal2float(date):
+        if isinstance(date, Decimal):
+            return float(date)
+        else:
+            return date
+
+    @staticmethod
     def _row_to_db_product_model(row):
         return db_models.Product(product_id=row.product_id,
                                  name=row.name,
@@ -197,7 +205,6 @@ class Connection(api.Connection):
         return db_models.Account(user_id=row.user_id,
                                  domain_id=row.domain_id,
                                  balance=row.balance,
-                                 frozen_balance=row.frozen_balance,
                                  consumption=row.consumption,
                                  level=row.level,
                                  owed=row.owed,
@@ -1147,7 +1154,6 @@ class Connection(api.Connection):
         return query.one().count or 0, query.one().sum or 0
 
     def create_account(self, context, account):
-        import pdb;pdb.set_trace()
         session = get_session()
         with session.begin():
             account_ref = sa_models.Account()
@@ -1446,10 +1452,11 @@ class Connection(api.Connection):
         session = get_session()
         with session.begin():
             project_ref = sa_models.Project(**project.as_dict())
-            user_project_ref = sa_models.UserProject(**project.as_dict())
+            user_project_ref = sa_models.UsrPrjRelation(**project.as_dict())
             session.add(project_ref)
             session.add(user_project_ref)
-        return self._row_to_db_project_model(project_ref)
+        project_ref.created_at = self._transfer_time2str(project_ref.created_at)
+        return self._row_to_db_project_model(project_ref).__dict__
 
     @require_context
     def get_billing_owner(self, context, project_id):
@@ -1465,7 +1472,12 @@ class Connection(api.Connection):
         except NoResultFound:
             raise exception.AccountNotFound(user_id=project.user_id)
 
-        return self._row_to_db_account_model(account)
+        account.balance = self._transfer_decimal2float(account.balance)
+        account.consumption = self._transfer_decimal2float(account.consumption)
+        account.created_at = self._transfer_time2str(account.created_at)
+        account.updated_at = self._transfer_time2str(account.updated_at)
+        account.deleted_at = self._transfer_time2str(account.deleted_at)
+        return self._row_to_db_account_model(account).__dict__
 
     @require_admin_context
     @oslo_db_api.wrap_db_retry(max_retries=5, retry_on_deadlock=True,
@@ -1530,7 +1542,10 @@ class Connection(api.Connection):
         except NoResultFound:
             raise exception.ProjectNotFound(project_id=project_id)
 
-        return self._row_to_db_project_model(project)
+        project.consumption = self._transfer_decimal2float(project.consumption)
+        project.created_at = self._transfer_time2str(project.created_at)
+        project.updated_at = self._transfer_time2str(project.updated_at)
+        return self._row_to_db_project_model(project).__dict__
 
     @require_context
     def get_user_projects(self, context, user_id=None,
