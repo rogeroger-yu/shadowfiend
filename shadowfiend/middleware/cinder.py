@@ -1,15 +1,14 @@
-import logging
 import json
 import re
 from stevedore import extension
 from oslo_config import cfg
-
+from oslo_log import log
 from shadowfiend.common import constants as const
 from shadowfiend.middleware import base
 from shadowfiend.services.cinder import CinderClient
 
-
-LOG = logging.getLogger(__name__)
+CONF = cfg.CONF
+LOG = log.getLogger(__name__)
 
 UUID_RE = r"([0-9a-f]{32}|[0-9a-z]{8}-[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{12})"
 RESOURCE_RE = r"(volumes|snapshots)"
@@ -35,11 +34,11 @@ class SizeItem(base.ProductItem):
         elif 'snapshot' in body:
             try:
                 volume = CinderClient.volume_get(body['snapshot']['volume_id'],
-                                                 cfg.CONF.billing.region_name)
+                                                 CONF.billing.region_name)
             except Exception:
                 # INFO(chengkun): just use for checker service
                 volume = CinderClient.snapshot_get(body['snapshot']['snapshot_id'],
-                                                   cfg.CONF.billing.region_name)
+                                                   CONF.billing.region_name)
             return volume.size
 
 
@@ -123,8 +122,8 @@ class CinderBillingProtocol(base.BillingProtocol):
 
         try:
             self.sf_client.resize_resource_order(order_id,
-                                               quantity=quantity,
-                                               resource_type=resource_type)
+                                                 quantity=quantity,
+                                                 resource_type=resource_type)
         except Exception:
             msg = "Unbale to resize the order: %s" % order_id
             LOG.exception(msg)

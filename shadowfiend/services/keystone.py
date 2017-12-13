@@ -34,3 +34,15 @@ class KeystoneClient(BaseClient):
             version='3',
             session=self.session,
             auth_url=self.auth.auth_url)
+
+    def get_role_list(user=None, group=None, domain=None, project=None):
+        return self.ks_client.roles.list(user=user,
+                                         group=group,
+                                         domain=domain,
+                                         project=project)
+
+    def get_project_list(doamin=None, name=None, user=None):
+        return self.ks_client.projects.list(domain=domain, name=name, user=user)
+
+    def get_domain_list(name=None, enabled=None):
+        return self.ks_client.domains.list(name=name, enabled=enabled)

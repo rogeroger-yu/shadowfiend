@@ -13,24 +13,19 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-from oslo_config import cfg
-from oslo_log import log
+from pecan import rest
 
-from gnocchiclient import client as gnocchi_client
-from shadowfiend.services import BaseClient
+from shadowfiend.api import expose
 
-
-LOG = log.getLogger(__name__)
-CONF = cfg.CONF
-
-SERVICE_CLIENT_OPTS = 'service_client'
+from shadowfiend.api.controllers.noauth import account
+from shadowfiend.api.controllers.noauth import project
+from shadowfiend.api.controllers.v1 import models
 
 
-class GnocchiClient(BaseClient):
-    def __init__(self):
-        super(GnocchiClient, self).__init__()
+class NoAuthController(rest.RestController):
+    accounts = account.AccountController()
+    projects = project.ProjectController()
 
-        self.gnocchi_client = gnocchi_client.Client(
-            version='1',
-            session=self.session,
-            auth=self.auth)
+    @expose.expose(models.Version)
+    def get(self):
+        return models.Version(version='noauth')

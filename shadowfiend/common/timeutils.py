@@ -30,6 +30,22 @@ from six import moves
 from stevedore import extension
 
 
+# ISO 8601 extended time format with microseconds
+_ISO8601_TIME_FORMAT_SUBSECOND = '%Y-%m-%dT%H:%M:%S.%f'
+_ISO8601_TIME_FORMAT = '%Y-%m-%dT%H:%M:%S'
+PERFECT_TIME_FORMAT = _ISO8601_TIME_FORMAT_SUBSECOND
+
+
+def parse_isotime(timestamp):
+    """Parse time from ISO 8601 format."""
+    try:
+        return iso8601.parse_date(timestamp)
+    except iso8601.ParseError as e:
+        raise ValueError(unicode(e))
+    except TypeError as e:
+        raise ValueError(unicode(e))
+
+
 def dt2ts(orig_dt):
     """Translate a datetime into a timestamp."""
     return calendar.timegm(orig_dt.timetuple())
@@ -69,6 +85,21 @@ def utcnow():
 def utcnow_ts():
     """Returns a timestamp for the current utc time."""
     return timeutils.utcnow_ts()
+
+
+def nl2utc(timestamp):
+    """Normalize time in arbitrary timezone to UTC naive object."""
+    offset = timestamp.utcoffset()
+    if offset is None:
+        return timestamp
+    return timestamp.replace(tzinfo=None) - offset
+
+
+def strtime(at=None, fmt=PERFECT_TIME_FORMAT):
+    """Returns formatted utcnow."""
+    if not at:
+        at = utcnow()
+    return at.strftime(fmt)
 
 
 def get_month_days(dt):

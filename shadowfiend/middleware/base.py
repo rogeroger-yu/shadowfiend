@@ -1,18 +1,18 @@
 import copy
-
 import webob
-import logging
+import uuid
+
 from oslo_config import cfg
+from oslo_log import log
 from decimal import Decimal
 
 from shadowfiend.client.v1 import client
 from shadowfiend.common import exception
-from shadowfiend.openstack.common import uuidutils
-from shadowfiend.price import pricing
-from shadowfiend import utils
+from shadowfiend.common import utils
 
 
-LOG = logging.getLogger(__name__)
+CONF = cfg.CONF
+LOG = log.getLogger(__name__)
 
 OPTS = [
     cfg.BoolOpt('enable_billing',
@@ -25,7 +25,7 @@ OPTS = [
                default="regionOne",
                help="The current region name"),
 ]
-cfg.CONF.register_opts(OPTS, group="billing")
+CONF.register_opts(OPTS, group="billing")
 
 
 class SimpleResp(object):
@@ -49,10 +49,22 @@ class BillingProtocol(object):
         self.conf = conf
 
         # force to use v3 api
-        self.auth_url = self._conf_get('auth_url')
-        self.user = self._conf_get('username')
-        self.password = self._conf_get('password')
-        self.tenant_name = self._conf_get('project_name')
+        identity_uri = self._conf_get('auth_url')
+        if not identity_uri:
+            auth_host = CONF.my_ip
+            auth_port = self._conf_get('auth_port')
+            auth_protocol = self._conf_get('auth_protocol')
+            identity_uri = '%s://%s:%s' % (auth_protocol, auth_host,
+                                           auth_port)
+        else:
+            identity_uri = identity_uri.rstrip('/')
+
+        # force to use v3 api
+        self.auth_url = '%s/v3' % identity_uri
+        self.admin_user = self._conf_get('admin_user')
+        self.admin_password = self._conf_get('admin_password')
+        self.admin_tenant_name = self._conf_get('admin_tenant_name')
+
 
         self.black_list = [
             self.create_resource_action,
@@ -70,9 +82,9 @@ class BillingProtocol(object):
         self.no_billing_resource_actions = []
 
         # make billing client
-        self.sf_client = client.Client(username=self.user,
-                                       password=self.password,
-                                       project_name=self.tenant_name,
+        self.sf_client = client.Client(username=self.admin_user,
+                                       password=self.admin_password,
+                                       project_name=self.admin_tenant_name,
                                        auth_url=self.auth_url)
 
     def __call__(self, env, start_response):
@@ -84,7 +96,7 @@ class BillingProtocol(object):
         path_info = env['PATH_INFO']
         roles = env['HTTP_X_ROLES'].split(',')
 
-        if not cfg.CONF.billing.enable_billing or \
+        if not CONF.billing.enable_billing or \
                 request_method in set(['GET', 'OPTIONS', 'HEAD']):
             return self.app(env, start_response)
 
@@ -130,7 +142,7 @@ class BillingProtocol(object):
                 if request_method == "POST" \
                         and ("floatingips" in path_info or
                              'floatingipsets' in path_info):
-                    min_balance = cfg.CONF.billing.min_balance_fip
+                    min_balance = CONF.billing.min_balance_fip
 
                 success, result = self._check_if_owed(env, start_response,
                                                      project_id, min_balance)
@@ -179,7 +191,7 @@ class BillingProtocol(object):
                 # and contained in notification message. When gring-waiter receive
                 # the notification, if it contains month_billing in roles list, it
                 # will do nothing, because gring-waiter only handles the hourly
-                # billing resource. After gringotts is centralized, this will be
+                # billing resource. After shadowfiend is centralized, this will be
                 # removed. And this requires billing middleware places before the
                 # keystonecontext middleware in api-paste.ini
                 env['HTTP_X_ROLES'] = env['HTTP_X_ROLES'] + ',month_billing'
@@ -334,7 +346,7 @@ class BillingProtocol(object):
             if account['level'] == 9:
                 return True, False
             if Decimal(str(account['balance'])) <= Decimal(min_balance):
-                LOG.warn('The billing owner of project %s is owed' % project_id)
+                LOG.warning('The billing owner of project %s is owed' % project_id)
                 return False, self._reject_request_402(env, start_response,
                                                        min_balance)
             return True, False
@@ -450,7 +462,7 @@ class BillingProtocol(object):
             self.sf_client.freeze_balance(project_id, total_price)
             return True, False
         except exception.PaymentRequired:
-            LOG.warn("The balance of the billing owner of "
+            LOG.warning("The balance of the billing owner of "
                      "the project %s is not sufficient" % project_id)
             return False, self._reject_request_402(env, start_response,
                                                    total_price)
@@ -473,7 +485,7 @@ class BillingProtocol(object):
             self.sf_client.unfreeze_balance(project_id, total_price)
             return True, False
         except exception.PaymentRequired:
-            LOG.warn("The frozen balance of the billing owner of "
+            LOG.warning("The frozen balance of the billing owner of "
                      "the project %s is not sufficient" % project_id)
             return False, self._reject_request_402(env, start_response,
                                                    total_price)
@@ -487,6 +499,23 @@ class BillingProtocol(object):
                   'for the reason: %s' % (project_id, e)
             LOG.exception(msg)
             return False, self._reject_request_500(env, start_response)
+
+    def check_if_project_has_billing_owner(self, env,
+                                           start_response, project_id):
+        try:
+            account = self.sf_client.get_billing_owner(project_id)
+            if not account:
+                result = self._reject_request(env, start_response,
+                                              'The project has no billing owner',
+                                              '403 Forbidden')
+                return False, result
+        except Exception as e:
+            msg = 'Unable to get account info from billing service, ' \
+                  'for the reason: %s' % e
+            LOG.exception(msg)
+            return False, self._reject_request_500(env, start_response)
+
+        return True, None
 
     def get_no_billing_resource_type(self, path_info, position):
         for resource_regex in self.no_billing_resource_regexs:
@@ -538,7 +567,7 @@ class BillingProtocol(object):
 
     def _get_order_by_resource_id(self, env, start_response, resource_id):
         try:
-            order = self.gclient.get_order_by_resource_id(resource_id)
+            order = self.sf_client.get_order_by_resource_id(resource_id)
             return True, order
         except exception.HTTPNotFound:
             msg = 'Can not find the order of the resource: %s' % resource_id
@@ -566,7 +595,7 @@ class BillingProtocol(object):
         2. Create order, can create cron job in the request
            create order
         """
-        order_id = uuidutils.generate_uuid()
+        order_id = str(uuid.uuid4())
 
         # Create subscriptions for this order
         for ext in self.product_items.extensions:
@@ -574,12 +603,12 @@ class BillingProtocol(object):
             ext.obj.create_subscription(env, body, order_id, type=state)
 
         self.sf_client.create_order(order_id,
-                                  cfg.CONF.billing.region_name,
-                                  unit_price,
-                                  unit,
-                                  period=period,
-                                  renew=renew,
-                                  **resource.as_dict())
+                                    CONF.billing.region_name,
+                                    unit_price,
+                                    unit,
+                                    period=period,
+                                    renew=renew,
+                                    **resource.as_dict())
 
 
     def close_order(self, env, start_response, order_id):
@@ -665,6 +694,15 @@ class BillingProtocol(object):
         start_response(status_code, resp.headers)
         return resp.body
 
+    def _conf_get(self, name):
+        # try config from paste-deploy first
+        if name in self.conf:
+            return self.conf[name]
+        try:
+            return CONF.keystone_authtoken[name]
+        except cfg.NoSuchOptError:
+            return None
+
     def delete_resource_order(self, env, start_response,
                               order_id, resource_type):
         try:
@@ -707,8 +745,8 @@ class ProductItem(object):
 
     service = None
 
-    def __init__(self, gclient):
-        self.gclient = gclient
+    def __init__(self, sf_client):
+        self.sf_client = sf_client
 
     def get_product_name(self, body):
         raise NotImplementedError
@@ -725,7 +763,7 @@ class ProductItem(object):
         except KeyError:
             user_id = env['HTTP_X_AUTH_USER_ID']
             project_id = env['HTTP_X_AUTH_PROJECT_ID']
-        region_id = cfg.CONF.billing.region_name
+        region_id = CONF.billing.region_name
         return Collection(product_name=self.get_product_name(body),
                           service=self.service,
                           region_id=region_id,
@@ -737,7 +775,7 @@ class ProductItem(object):
         """Subscribe to this product
         """
         collection = self.get_collection(env, body)
-        result = self.gclient.create_subscription(order_id,
+        result = self.sf_client.create_subscription(order_id,
                                                   type=type,
                                                   **collection.as_dict())
         return result
@@ -745,18 +783,37 @@ class ProductItem(object):
     def get_unit_price(self, env, body, method):
         """Get product unit price"""
         collection = self.get_collection(env, body)
-        product = self.gclient.get_product(collection.product_name,
+        product = self.sf_client.get_product(collection.product_name,
                                            collection.service,
                                            collection.region_id)
         if product:
             if 'unit_price' in product:
-                price_data = pricing.get_price_data(product['unit_price'],
-                                                    method)
+                unit_price = product['unit_price'] 
+                if not unit_price:
+                    price_data = None
+                if not method or method == 'hour':
+                    price_data = unit_price.get('price', None)
+                elif method == 'month':
+                    price_data = unit_price.get('monthly_price', None)
+                elif method == 'year':
+                    price_data = unit_price.get('yearly_price', None)
             else:
                 price_data = None
 
-            return pricing.calculate_price(
-                collection.resource_volume, price_data)
+            def calculate_price(quantity, price_data=None):
+                if price_data and not isinstance(price_data, dict):
+                    raise exception.InvalidParameterValue('price_data should be a dict')
+            
+                if price_data and 'type' in price_data:
+                    base_price = quantize_decimal(price_data.get('base_price', 0))
+            
+                    if (price_data['type'] == 'segmented') and (
+                            'segmented' in price_data):
+                        segmented_price = calculate_segmented_price(
+                            quantity, price_data['segmented'])
+            
+                        return segmented_price + base_price
+            return calculate_price(collection.resource_volume, price_data)
         else:
             return 0
 

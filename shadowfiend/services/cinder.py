@@ -16,8 +16,9 @@
 from oslo_config import cfg
 from oslo_log import log
 
-from cinderclient import client as c_client
+from cinderclient import client as cinder_client
 from shadowfiend.services import BaseClient
+from shadowfiend.services import Resource
 from shadowfiend.common import constants as const
 from shadowfiend.common import utils
 
@@ -32,14 +33,14 @@ class CinderClient(BaseClient):
     def __init__(self):
         super(CinderClient, self).__init__()
 
-        self.c_client = c_client.Client(
-            version=CONF.keystone_fetcher.keystone_version,
+        self.cinder_client = cinder_client.Client(
+            version='1',
             session=self.session,
             auth_url=self.auth.auth_url)
 
     def volume_get(volume_id, region_name=None):
         try:
-            volume = self.c_client.volumes.get(volume_id)
+            volume = self.cinder_client.volumes.get(volume_id)
         except NotFound:
             return None
         status = utils.transform_status(volume.status)
@@ -53,7 +54,7 @@ class CinderClient(BaseClient):
 
     def snapshot_get(snapshot_id, region_name=None):
         try:
-            sp = self.c_client.volume_snapshots.get(snapshot_id)
+            sp = self.cinder_client.volume_snapshots.get(snapshot_id)
         except NotFound:
             return None
         status = utils.transform_status(sp.status)

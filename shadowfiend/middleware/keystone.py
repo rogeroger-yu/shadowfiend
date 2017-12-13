@@ -1,19 +1,19 @@
 from __future__ import absolute_import
 
 import copy
+import json
 import re
 
 import webob
 import logging
 from oslo_config import cfg
 
-from gringotts.client.noauth import client
-from gringotts.openstack.common import jsonutils
+from shadowfiend.client.noauth import client
 from keystone.common import dependency
 from keystone.common import driver_hints
 
 LOG = logging.getLogger(__name__)
-cfg.CONF.import_group("billing", "gringotts.middleware.base")
+cfg.CONF.import_group("billing", "shadowfiend.middleware.base")
 
 KEYSTONE_OPTS = [
     cfg.StrOpt('initial_balance',
@@ -44,7 +44,7 @@ PROJECT_RESOURCE_RE = r"(projects|tenants)"
 ROLE_RESOURCE_RE = r"(roles|roles/OS-KSADM)"
 
 
-class MiniResp(object):
+class SimpleResp(object):
     def __init__(self, error_message, env, headers=[]):
         # The HEAD method is unique: it must never return a body, even if
         # it reports an error (RFC-2616 clause 9.4). We relieve callers
@@ -89,28 +89,28 @@ class KeystoneBillingProtocol(object):
         self.role_id_position = 6
 
         self.user_regex = re.compile(
-            r"^/%s/%s/%s([.][^.]+)?$" % \
-                (API_VERSION, USER_RESOURCE_RE, UUID_RE),
+            r"^/%s/%s([.][^.]+)?$" % \
+                (USER_RESOURCE_RE, UUID_RE),
             re.UNICODE)
         self.create_user_regex = re.compile(
-            r"^/%s/%s([.][^.]+)?$" % (API_VERSION, USER_RESOURCE_RE),
+            r"^/%s([.][^.]+)?$" % (USER_RESOURCE_RE),
             re.UNICODE)
         self.project_regex = re.compile(
-            r"^/%s/%s/%s([.][^.]+)?$" % \
-                (API_VERSION, PROJECT_RESOURCE_RE, UUID_RE),
+            r"^/%s/%s([.][^.]+)?$" % \
+                (PROJECT_RESOURCE_RE, UUID_RE),
             re.UNICODE)
         self.create_project_regex = re.compile(
-            r"^/%s/%s([.][^.]+)?$" % (API_VERSION, PROJECT_RESOURCE_RE),
+            r"^/%s([.][^.]+)?$" % (PROJECT_RESOURCE_RE),
             re.UNICODE)
         self.role_regex = re.compile(
-            r"^/%s/%s/%s/%s/%s/%s/%s([.][^.]+)?$" % \
-                (API_VERSION, PROJECT_RESOURCE_RE, UUID_RE, USER_RESOURCE_RE,
+            r"^/%s/%s/%s/%s/%s/%s([.][^.]+)?$" % \
+                (PROJECT_RESOURCE_RE, UUID_RE, USER_RESOURCE_RE,
                  UUID_RE, ROLE_RESOURCE_RE, UUID_RE),
             re.UNICODE)
 
         noauth_billing_endpoint = cfg.CONF.billing.billing_endpoint + \
             '/noauth'
-        self.gclient = client.Client(endpoint=noauth_billing_endpoint)
+        self.sf_client = client.Client(endpoint=noauth_billing_endpoint)
 
     def create_user_action(self, method, path_info):
         if method == "POST" and self.create_user_regex.search(path_info):
@@ -146,7 +146,7 @@ class KeystoneBillingProtocol(object):
         users = []
         try:
             for r in result:
-                user = jsonutils.loads(r)['user']
+                user = json.loads(r)['user']
                 users.append(User(
                     user_id=user['id'],
                     user_name=user['name'],
@@ -159,7 +159,7 @@ class KeystoneBillingProtocol(object):
         projects = []
         try:
             for r in result:
-               project = jsonutils.loads(r)['project']
+               project = json.loads(r)['project']
                projects.append(Project(
                    project_id=project['id'],
                    project_name=project['name'],
@@ -219,7 +219,7 @@ class KeystoneBillingProtocol(object):
 
     def __call__(self, env, start_response):
         request_method = env['REQUEST_METHOD']
-        path_info = env.get('RAW_PATH_INFO') or env.get('REQUEST_URI')
+        path_info = env.get('PATH_INFO')
 
         if not cfg.CONF.billing.enable_billing or \
                 request_method in set(['GET', 'OPTIONS', 'HEAD']):
@@ -302,7 +302,7 @@ class KeystoneBillingProtocol(object):
         balance = balance or cfg.CONF.billing.initial_balance
         consumption = consumption or 0
         level = level or cfg.CONF.billing.initial_level
-        self.gclient.create_account(
+        self.sf_client.create_account(
             user.user_id, user.domain_id,
             balance, consumption, level)
 
@@ -310,21 +310,21 @@ class KeystoneBillingProtocol(object):
                        project, consumption=None):
         consumption = consumption or 0
         user_id = self.billing_admin_user_id
-        self.gclient.create_project(
+        self.sf_client.create_project(
             project.project_id, project.domain_id,
             consumption, user_id)
 
     def delete_project(self, env, start_response, body,
                        project_id, region_name=None):
         try:
-            self.gclient.delete_resources(project_id)
+            self.sf_client.delete_resources(project_id)
         except Exception:
             return False, self._reject_request_500(env, start_response)
         return True, None
 
     def add_role(self, env, start_response, user_id, project_id):
         try:
-            self.gclient.change_billing_owner(
+            self.sf_client.change_billing_owner(
                 user_id, project_id)
         except Exception:
             return False, self._reject_request_500(env, start_response)
@@ -332,7 +332,7 @@ class KeystoneBillingProtocol(object):
 
     def get_project(self, env, start_response, project_id):
         try:
-            result = self.gclient.get_project(project_id)
+            result = self.sf_client.get_project(project_id)
         except Exception:
             return False, self._reject_request_500(env, start_response)
         return True, result
@@ -348,7 +348,7 @@ class KeystoneBillingProtocol(object):
                                     "500 BillingServiceError")
 
     def _reject_request(self, env, start_response, resp_data, status_code):
-        resp = MiniResp('{"msg": "%s"}' % resp_data, env)
+        resp = SimpleResp('{"msg": "%s"}' % resp_data, env)
         start_response(status_code, resp.headers)
         return resp.body
 

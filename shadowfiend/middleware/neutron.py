@@ -1,15 +1,15 @@
+import json
 import re
+import uuid
 from stevedore import extension
 
 import logging
 from oslo_config import cfg
 
-from gringotts import constants as const
-from gringotts.middleware import base
-from gringotts.openstack.common import jsonutils
-from gringotts.openstack.common import uuidutils
-from gringotts.price import pricing
-from gringotts.services import neutron
+from shadowfiend.common import constants as const
+from shadowfiend.middleware import base
+from shadowfiend.price import pricing
+from shadowfiend.services import neutron
 
 
 LOG = logging.getLogger(__name__)
@@ -105,7 +105,7 @@ class NeutronBillingProtocol(base.BillingProtocol):
         names = ['floatingip', 'router', 'listener']
         for name in names:
             product_items[name] = extension.ExtensionManager(
-                namespace='gringotts.%s.product_items' % name,
+                namespace='shadowfiend.%s.product_items' % name,
                 invoke_on_load=True,
                 invoke_args=(self.gclient,))
 
@@ -187,7 +187,7 @@ class NeutronBillingProtocol(base.BillingProtocol):
     def parse_app_result(self, body, result, user_id, project_id):
         resources = []
         try:
-            result = jsonutils.loads(result[0])
+            result = json.loads(result[0])
             if 'floatingip' in result:
                 fip = result['floatingip']
                 resources.append(base.Resource(
@@ -224,7 +224,7 @@ class NeutronBillingProtocol(base.BillingProtocol):
 
     def create_order(self, env, start_response, body,
                      unit_price, unit, period, renew, resource):
-        order_id = uuidutils.generate_uuid()
+        order_id = str(uuid.uuid4())
 
         for ext in self.product_items[resource.type].extensions:
             state = ext.name.split('_')[0]

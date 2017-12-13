@@ -16,6 +16,7 @@
 from oslo_config import cfg
 from pecan import hooks
 
+from shadowfiend.api import acl
 from shadowfiend.common import context
 from shadowfiend.conductor import api as conductor_api
 from shadowfiend.processor import api as processor_api
@@ -61,6 +62,9 @@ class ContextHook(hooks.PecanHook):
         roles = headers.get('X-Roles', '').split(',')
         auth_token_info = state.request.environ.get('keystone.token_info')
 
+        is_admin = acl.context_is_admin(headers)
+        is_domain_owner = acl.context_is_domain_owner(headers)
+
         auth_url = CONF.keystone_authtoken.auth_uri
 
         state.request.context = context.make_context(
@@ -73,6 +77,8 @@ class ContextHook(hooks.PecanHook):
             project_id=project_id,
             domain_id=domain_id,
             domain_name=domain_name,
+            is_admin=is_admin,
+            is_domain_owner=is_domain_owner,
             roles=roles)
 
 

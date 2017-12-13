@@ -28,7 +28,7 @@ from shadowfiend.api.controllers.v1 import models
 
 class V1Controller(rest.RestController):
     accounts = account.AccountController()
-#    projects = project.ProjectController()
+    projects = project.ProjectController()
 #    relations = relation.RelationController()
 #    charges = charge.ChargeController()
 #    orders = order.OrderController()

@@ -1,15 +1,15 @@
+import json
 import re
 import logging
 from stevedore import extension
 from oslo_config import cfg
 
-from gringotts import constants as const
-from gringotts import exception
-from gringotts.middleware import base
-from gringotts.openstack.common import jsonutils
-from gringotts.openstack.common import memorycache
-from gringotts.services import nova
-from gringotts.services import glance
+from shadowfiend.common import constants as const
+from shadowfiend.common import exception
+from shadowfiend.middleware import base
+from shadowfiend.common import memorycache
+from shadowfiend.services.nova import NovaClient
+from shadowfiend.services import glance
 
 LOG = logging.getLogger(__name__)
 
@@ -46,7 +46,7 @@ def _get_flavor(flavor_id):
         except Exception:
             msg = 'Error to fetch flavor: %s' % flavor_id
             LOG.exception(msg)
-            raise exception.GringottsException(message=msg)
+            raise exception.shadowfiendException(message=msg)
         cache.set(key, flavor, 86400)
     return flavor
 
@@ -61,7 +61,7 @@ def _get_image(image_id):
         if not image:
             msg = 'Error to fetch image: %s' % image_id
             LOG.exception(msg)
-            raise exception.GringottsException(message=msg)
+            raise exception.shadowfiendException(message=msg)
         cache.set(key, image, 86400)
     return image
 
@@ -145,9 +145,9 @@ class NovaBillingProtocol(base.BillingProtocol):
             self.restore_server_action,
         ]
         self.product_items = extension.ExtensionManager(
-            namespace='gringotts.server.product_items',
+            namespace='shadowfiend.server.product_items',
             invoke_on_load=True,
-            invoke_args=(self.gclient,))
+            invoke_args=(self.sf_client,))
 
     def other_server_actions(self, method, path_info, body):
         if method == "POST" and \
@@ -218,12 +218,12 @@ class NovaBillingProtocol(base.BillingProtocol):
         if count == 1:
             try:
                 if body['server'].get('return_reservation_id'):
-                    resv_id = jsonutils.loads(result[0])['reservation_id']
-                    servers = nova.server_list_by_resv_id(
+                    resv_id =json.loads(result[0])['reservation_id']
+                    servers = NovaClient.server_list_by_resv_id(
                         resv_id, region_name=cfg.CONF.billing.region_name)
                     server = servers[0].to_dict()
                 else:
-                    server = jsonutils.loads(result[0])['server']
+                    server = json.loads(result[0])['server']
                 resources.append(base.Resource(
                     resource_id=server['id'],
                     resource_name=body['server']['name'],
@@ -235,8 +235,8 @@ class NovaBillingProtocol(base.BillingProtocol):
                 return []
         else:
             try:
-                resv_id = jsonutils.loads(result[0])['reservation_id']
-                servers = nova.server_list_by_resv_id(
+                resv_id = json.loads(result[0])['reservation_id']
+                servers = NovaClient.server_list_by_resv_id(
                     resv_id, region_name=cfg.CONF.billing.region_name)
                 for server in servers:
                     server = server.to_dict()
@@ -259,7 +259,7 @@ class NovaBillingProtocol(base.BillingProtocol):
             LOG.exception(msg)
             return False, self._reject_request_500(env, start_response)
 
-        old_flavor = nova.server_get(resource_id).flavor['id']
+        old_flavor = NovaClient.server_get(resource_id).flavor['id']
 
         if new_flavor == old_flavor:
             return True, None
@@ -267,13 +267,13 @@ class NovaBillingProtocol(base.BillingProtocol):
         region_id = cfg.CONF.billing.region_name
 
         new_flavor = '%s:%s' % (const.PRODUCT_INSTANCE_TYPE_PREFIX,
-                                nova.flavor_get(region_id, new_flavor).name)
+                                NovaClient.flavor_get(region_id, new_flavor).name)
         old_flavor = '%s:%s' % (const.PRODUCT_INSTANCE_TYPE_PREFIX,
-                                nova.flavor_get(region_id, old_flavor).name)
+                                NovaClient.flavor_get(region_id, old_flavor).name)
         service = const.SERVICE_COMPUTE
 
         try:
-            self.gclient.resize_resource_order(order_id,
+            self.sf_client.resize_resource_order(order_id,
                                                resource_type=resource_type,
                                                new_flavor=new_flavor,
                                                old_flavor=old_flavor,

@@ -16,13 +16,10 @@
 from oslo_log import log
 
 from shadowfiend.client import client
-from shadowfiend import utils as gringutils
 
 
 LOG = log.getLogger(__name__)
 TIMESTAMP_TIME_FORMAT = '%Y-%m-%d %H:%M:%S.%f'
-
-quantize_decimal = gringutils._quantize_decimal
 
 
 class Client(object):

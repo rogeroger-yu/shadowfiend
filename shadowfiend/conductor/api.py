@@ -31,12 +31,16 @@ class API(rpc_service.API):
         super(API, self).__init__(transport, context,
                                   topic=cfg.CONF.conductor.topic)
 
-    def test(self):
-        #return 'test RPC'
-        #return self._client.cast({}, 'test')
-        return self._call('test', arg='test_arg')
+    def change_billing_owner(self, project_id, user_id):
+        """"Change billing_owner of this project"""
+        args = {'project_id': project_id,
+                'user_id': user_id}
+        return self._call('change_billing_owner', args=args)
 
-#    def cluster_create_async(self, cluster, create_timeout):
-#        self._cast('cluster_create', cluster=cluster,
-#                   create_timeout=create_timeout)
+    def get_billing_owner(self, context, project_id):
+        args = {'project_id': project_id}
+        return self._call('get_billing_owner', args=args)
 
+    def create_account(self, context, account):
+        import pdb;pdb.set_trace()
+        return self._call('create_account', **account)

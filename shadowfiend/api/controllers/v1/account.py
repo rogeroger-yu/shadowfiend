@@ -13,26 +13,27 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 import datetime
+import json
 
 import pecan
 from pecan import rest
 from wsme import types as wtypes
 from wsmeext.pecan import wsexpose
 from oslo_config import cfg
-from oslo_log import log as logging
+from oslo_log import log
 
 from shadowfiend.common import policy
 #from shadowfiend import exception
 #from shadowfiend import utils as gringutils
 from shadowfiend.api.controllers.v1 import models
-#from shadowfiend.db import models as db_models
+from shadowfiend.db import models as db_models
 #from shadowfiend.services import keystone
 #from shadowfiend.checker import notifier
 #from shadowfiend.openstack.common.gettextutils import _
 from shadowfiend.conductor import api as conductor_api
 
 
-LOG = logging.getLogger(__name__)
+LOG = log.getLogger(__name__)
 HOOK = pecan.request
 
 class ExistAccountController(rest.RestController):
@@ -51,7 +52,7 @@ class ExistAccountController(rest.RestController):
     def _account(self, user_id=None):
         _id = user_id or self._id
         try:
-            account = HOOK.conductor_rpcapi.get_account(request.context,
+            account = HOOK.conductor_rpcapi.get_account(HOOK.context,
                                                         _id)
         except exception.AccountNotFound:
             LOG.error("Account %s not found" % _id)
@@ -67,10 +68,10 @@ class ExistAccountController(rest.RestController):
     @wsexpose(None, wtypes.text, body=None)
     def put(self, data):
         """Charge the account."""
-        check_policy(request.context, "account:charge")
+        check_policy(HOOK.context, "account:charge")
 
         # check uos_bill_account_charge_limited charge value
-        if "uos_bill_account_charge_limited" in request.context.roles:
+        if "uos_bill_account_charge_limited" in HOOK.context.roles:
             lscv = int(cfg.CONF.limited_support_charge_value)
             if data.value < -lscv or data.value > lscv:
                 raise exception.InvalidChargeValue(value=data.value)
@@ -80,11 +81,11 @@ class ExistAccountController(rest.RestController):
                 raise exception.InvalidChargeValue(value=data.value)
 
         remarks = data.remarks if data.remarks != wsme.Unset else None
-        operator = request.context.user_id
+        operator = HOOK.context.user_id
 
         try:
             charge, is_first_charge = HOOK.conductor_rpcapi.\
-                    update_account(request.context,
+                    update_account(HOOK.context,
                                    self._id,
                                    operator=operator,
                                    **data.as_dict())
@@ -93,7 +94,7 @@ class ExistAccountController(rest.RestController):
                 value = gringutils.calculate_bonus(data['value'])
                 if value > 0:
                     bonus, _ = HOOK.conductor_rpcapi.\
-                            update_account(request.context,
+                            update_account(HOOK.context,
                                            self._id,
                                            type='bonus',
                                            value=value,
@@ -113,7 +114,7 @@ class ExistAccountController(rest.RestController):
                         and data.value >= min_charge_value \
                         and reward_value > 0:
                     remarks = "reward because of invitation"
-                    HOOK.conductor_rpcapi.update_account(request.context,
+                    HOOK.conductor_rpcapi.update_account(HOOK.context,
                                                          _account.inviter,
                                                          type='bonus',
                                                          value=reward_value,
@@ -123,41 +124,41 @@ class ExistAccountController(rest.RestController):
                                                          invitee=self._id)
                     if cfg.CONF.notify_account_charged:
                         inviter = HOOK.conductor_rpcapi.\
-                                get_account(request.context,
+                                get_account(HOOK.context,
                                             _account.inviter).as_dict()
                         contact = kunkka.get_uos_user(inviter['user_id'])
                         self.notifier = notifier.NotifierService(
                             cfg.CONF.checker.notifier_level)
                         self.notifier.notify_account_charged(
-                            request.context, inviter, contact,
+                            HOOK.context, inviter, contact,
                             'bonus', reward_value, bonus=0,
                             operator=operator,
-                            operator_name=request.context.user_name,
+                            operator_name=HOOK.context.user_name,
                             remarks="reward because of invitation")
-            HOOK.conductor_rpcapi.set_charged_orders(request.context, self._id)
+            HOOK.conductor_rpcapi.set_charged_orders(HOOK.context, self._id)
         except exception.NotAuthorized as e:
-            LOG.exception('Fail to charge the account:%s '
+            LOG.ERROR('Fail to charge the account:%s '
                           'due to not authorization' % self._id)
             raise exception.NotAuthorized()
         except Exception as e:
-            LOG.exception('Fail to charge the account:%s, '
+            LOG.ERROR('Fail to charge the account:%s, '
                           'charge value: %s' % (self._id, data.value))
             raise exception.DBError(reason=e)
         else:
             # Notifier account
             if cfg.CONF.notify_account_charged:
-                account = HOOK.conductor_rpcapi.get_account(request.context,
+                account = HOOK.conductor_rpcapi.get_account(HOOK.context,
                                                             self._id).as_dict()
                 contact = kunkka.get_uos_user(account['user_id'])
                 language = cfg.CONF.notification_language
                 self.notifier = notifier.NotifierService(
                     cfg.CONF.checker.notifier_level)
                 self.notifier.notify_account_charged(
-                    request.context, account, contact,
+                    HOOK.context, account, contact,
                     data['type'], charge.value,
                     bonus=bonus.value if has_bonus else 0,
                     operator=operator,
-                    operator_name=request.context.user_name,
+                    operator_name=HOOK.context.user_name,
                     remarks=remarks, language=language)
         return models.Charge.from_db_model(charge)
 
@@ -165,7 +166,7 @@ class ExistAccountController(rest.RestController):
     def get(self):
         """Get this account."""
         user_id = acl.get_limited_to_user(
-            request.headers, 'account_get') or self.id
+            HOOK.headers, 'account_get') or self.id
         return models.UserAccount.from_db_model(self._account(user_id=user_id))
 
     @wsexpose(None)
@@ -178,21 +179,21 @@ class ExistAccountController(rest.RestController):
         except (exception.NotFound):
             msg = _('Could not find account whose user_id is %s' % self._id)
         except Exception:
-            LOG.exception('Fail to create account: %s' % data.as_dict())
+            LOG.ERROR('Fail to create account: %s' % data.as_dict())
 
     #@wsexpose(models.UserAccount, int)
     @wsexpose(None, int)
     def level(self, level):
         """Update the account's level."""
-        check_policy(request.context, "account:level")
+        check_policy(HOOK.context, "account:level")
 
         if not isinstance(level, int) or level < 0 or level > 9:
             raise exception.InvalidParameterValue(err="Invalid Level")
         try:
             account = HOOK.conductor_rpcapi.change_account_level(
-                request.context, self._id, level)
+                HOOK.context, self._id, level)
         except Exception as e:
-            LOG.exception('Fail to change the account level of: %s' % self._id)
+            LOG.ERROR('Fail to change the account level of: %s' % self._id)
             raise exception.DBError(reason=e)
 
         return models.UserAccount.from_db_model(account)
@@ -209,9 +210,9 @@ class ExistAccountController(rest.RestController):
             raise exception.InvalidParameterValue(err="Invalid offset")
 
         user_id = acl.get_limited_to_user(
-            request.headers, 'account_charge') or self._id
+            HOOK.headers, 'account_charge') or self._id
 
-        charges = HOOK.conductor_rpcapi.get_charges(request.context,
+        charges = HOOK.conductor_rpcapi.get_charges(HOOK.context,
                                                      user_id=user_id,
                                                      type=type,
                                                      limit=limit,
@@ -223,7 +224,7 @@ class ExistAccountController(rest.RestController):
             charges_list.append(models.Charge.from_db_model(charge))
 
         total_price, total_count = HOOK.conductor_rpcapi.\
-                get_charges_price_and_count(request.context,
+                get_charges_price_and_count(HOOK.context,
                                             user_id=user_id,
                                             type=type,
                                             start_time=start_time,
@@ -242,13 +243,13 @@ class ExistAccountController(rest.RestController):
             return -1
 
         user_id = acl.get_limited_to_user(
-            request.headers, 'account_estimate') or self._id
+            HOOK.headers, 'account_estimate') or self._id
 
         account = self._account(user_id=user_id)
         if account.balance < 0:
             return -2
 
-        orders = HOOK.conductor_rpcapi.get_active_orders(request.context,
+        orders = HOOK.conductor_rpcapi.get_active_orders(HOOK.context,
                                                          user_id=user_id,
                                                          within_one_hour=True,
                                                          bill_methods=['hour'])
@@ -277,10 +278,10 @@ class ExistAccountController(rest.RestController):
         balance can support.
         """
         user_id = acl.get_limited_to_user(
-            request.headers, 'account_estimate') or self._id
+            HOOK.headers, 'account_estimate') or self._id
 
         account = self._account(user_id=user_id)
-        orders = HOOK.conductor_rpcapi.get_active_orders(request.context,
+        orders = HOOK.conductor_rpcapi.get_active_orders(HOOK.context,
                                                          user_id=user_id,
                                                          within_one_hour=True,
                                                          bill_methods=['hour'])
@@ -321,7 +322,7 @@ class ChargeController(rest.RestController):
            sort_key='created_at', sort_dir='desc'):
         """Get all charges of all account."""
 
-        check_policy(request.context, "charges:all")
+        check_policy(HOOK.context, "charges:all")
 
         if limit and limit < 0:
             raise exception.InvalidParameterValue(err="Invalid limit")
@@ -348,7 +349,7 @@ class ChargeController(rest.RestController):
                                          company=company)
             return users[user_id]
 
-        charges = HOOK.conductor_rpcapi.get_charges(request.context,
+        charges = HOOK.conductor_rpcapi.get_charges(HOOK.context,
                                                     user_id=user_id,
                                                     type=type,
                                                     limit=limit,
@@ -365,7 +366,7 @@ class ChargeController(rest.RestController):
             charges_list.append(acharge)
 
         total_price, total_count = HOOK.conductor_rpcapi.\
-                get_charges_price_and_count(request.context,
+                get_charges_price_and_count(HOOK.context,
                                             user_id=user_id,
                                             type=type,
                                             start_time=start_time,
@@ -384,11 +385,11 @@ class TransferMoneyController(rest.RestController):
         """Transfer money from one account to another.
         And only the domain owner can do the operation.
         """
-        is_domain_owner = acl.context_is_domain_owner(request.headers)
+        is_domain_owner = acl.context_is_domain_owner(HOOK.headers)
         if not is_domain_owner:
             raise exception.NotAuthorized()
 
-        HOOK.conductor_rpcapi.transfer_money(request.context, data)
+        HOOK.conductor_rpcapi.transfer_money(HOOK.context, data)
 
 
 class AccountController(rest.RestController):
@@ -405,16 +406,19 @@ class AccountController(rest.RestController):
         if _correct:
             return ExistAccountController(user_id), remainder
 
-    #@wsexpose(None, body=models.AdminAccount)
     @wsexpose(None, body=models.AdminAccount)
     def post(self, data):
         """Create a new account."""
         policy.check_policy(HOOK.context, "account:post")
+        import pdb; pdb.set_trace()
         try:
-            repsonse = HOOK.conductor_rpcapi.create_account(**data.as_dict())
+            #account = db_models.Account(**data.as_dict())
+            account = data.as_dict()
+            response = HOOK.conductor_rpcapi.create_account(HOOK.context,
+                                                            account)
             return response
         except Exception:
-            LOG.exception('Fail to create account: %s' % data.as_dict())
+            LOG.ERROR('Fail to create account: %s' % data.as_dict())
 
     @wsexpose(models.UserAccount, bool, int, int, wtypes.text)
     def get_all(self, owed=None, limit=None, offset=None):
@@ -427,13 +431,15 @@ class AccountController(rest.RestController):
             raise exception.InvalidParameterValue(err="Invalid offset")
 
         try:
-            accounts = HOOK.conductor_rpcapi.get_accounts(**data.as_dict())
-            count = HOOK.conductor_rpcapi.get_accounts_count(**data.as_dict())
+            accounts = HOOK.conductor_rpcapi.get_accounts(HOOK.context,
+                                                          **data.as_dict())
+            count = HOOK.conductor_rpcapi.get_accounts_count(HOOK.context,
+                                                             **data.as_dict())
         except exception.NotAuthorized as e:
-            LOG.exception('Failed to get all accounts')
+            LOG.ERROR('Failed to get all accounts')
             raise exception.NotAuthorized()
         except Exception as e:
-            LOG.exception('Failed to get all accounts')
+            LOG.ERROR('Failed to get all accounts')
             raise exception.DBError(reason=e)
 
         accounts = [models.AdminAccount.from_db_model(account)

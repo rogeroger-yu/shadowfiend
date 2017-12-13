@@ -45,6 +45,11 @@ class Client(object):
                      **kwargs)
         self.client.post('/accounts', body=_body)
 
+    def get_billing_owner(self, project_id):
+        resp, body = self.client.get('/projects/%s/billing_owner' %
+                                     project_id)
+        return body
+
     def get_order_by_resource_id():
         pass
 

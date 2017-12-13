@@ -15,6 +15,10 @@
 
 from oslo_config import cfg
 
+OPT_GROUP = cfg.OptGroup(
+    name='conductor',
+    title='Options for the shadowfiend-conductor service')
+
 SERVICE_OPTS = [
     cfg.StrOpt('topic',
                default='shadowfiend-conductor',
@@ -28,8 +32,6 @@ SERVICE_OPTS = [
                      'used for bay locking.')),
 ]
 
-opt_group = cfg.OptGroup(
-    name='conductor',
-    title='Options for the shadowfiend-conductor service')
-cfg.CONF.register_group(opt_group)
-cfg.CONF.register_opts(SERVICE_OPTS, opt_group)
+
+cfg.CONF.register_group(OPT_GROUP)
+cfg.CONF.register_opts(SERVICE_OPTS, OPT_GROUP)

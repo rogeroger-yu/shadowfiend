@@ -17,6 +17,7 @@ from pecan import rest
 from wsme import types as wtypes
 
 from shadowfiend.api.controllers import v1
+from shadowfiend.api.controllers import noauth
 from shadowfiend.api import expose
 
 
@@ -27,6 +28,7 @@ class RootController(rest.RestController):
     _default_version = 'v1'
 
     v1 = v1.V1Controller()
+    noauth = noauth.NoAuthController()
 
     @expose.expose(wtypes.text)
     def get(self):

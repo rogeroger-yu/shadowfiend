@@ -20,7 +20,7 @@ import oslo_messaging as messaging
 LOG = log.getLogger(__name__)
 
 class Handler(object):
-    def test(self, ctxt, arg):
+    def test(self, context, arg):
         LOG.debug('Received message from RPC.')
         self.keystone_fetcher = fetcher.KeystoneFetcher()
         #tenants = self.keystone_fetcher.get_tenants()

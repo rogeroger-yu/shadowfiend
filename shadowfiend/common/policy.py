@@ -62,7 +62,7 @@ def enforce(context, action, target):
     """
     init()
 
-    return _ENFORCER.enforce(action, target, context.to_dict(),
+    return _ENFORCER.enforce(action, target, context,
                              do_raise=True,
                              exc=PolicyNotAuthorized,
                              action=action)
@@ -86,7 +86,7 @@ def check_is_admin(roles):
 
 def check_policy(context, action):
     target = {
-        "project_id": context.project_id
+        "project_id": context.project_id,
         "user_id": context.user_id
     }
     enforce(context, action, target)

@@ -28,6 +28,11 @@ from gnocchiclient import exceptions as gexceptions
 from shadowfiend.common import timeutils
 from shadowfiend.services.keystone import KeystoneClient 
 from shadowfiend.services.gnocchi import GnocchiClient
+# services test fetcher
+#from shadowfiend.services.cinder import CinderClient
+#from shadowfiend.services.nova import NovaClient
+#from shadowfiend.services.glance import GlanceClient
+from shadowfiend.services.neutron import NeutronClient
 
 
 LOG = log.getLogger(__name__)
@@ -78,7 +83,7 @@ class GnocchiFetcher(GnocchiClient):
 
     def get_state(self, tenant_id): 
         query = {"=": {"project_id": tenant_id}}
-        resources = self.gn_client.resource.search(
+        resources = self.gnocchi_client.resource.search(
             resource_type='cloudkitty_state',
             query=query,
             limit=1)
@@ -92,7 +97,7 @@ class GnocchiFetcher(GnocchiClient):
             try:
                 # (aolwas) add "refresh=True" to be sure to get all posted
                 # measures for this particular metric
-                r = self.gn_client.metric.get_measures(
+                r = self.gnocchi_client.metric.get_measures(
                     metric='state',
                     resource_id=state_resource_id,
                     query=query,
@@ -112,3 +117,32 @@ class GnocchiFetcher(GnocchiClient):
 #class TenantBillFetcher(Fetcher):
 #    def __init__():
 #        pass
+
+# service test fetcher
+#class CinderFetcher(CinderClient):
+#    def __init__(self):
+#        super(CinderFetcher, self).__init__()
+#
+#    def get_volumes(self, volume_id):
+#        return self.cinder_client.volumes.get(volume_id)
+
+#class NovaFetcher(NovaClient):
+#    def __init__(self):
+#        super(NovaFetcher, self).__init__()
+#
+#    def flavor_list(self):
+#        return self.nova_client.flavors.list()
+
+#class GlanceFetcher(GlanceClient):
+#    def __init__(self):
+#        super(GlanceFetcher, self).__init__()
+#
+#    def image_list(self):
+#        return self.image_get(image_id='eb54e9f2-fb74-47f7-81f8-e6e449cc3a91')
+
+class NeutronFetcher(NeutronClient):
+    def __init__(self):
+        super(NeutronFetcher, self).__init__()
+
+    def networks_list(self, project_id): 
+        return  self.network_list(project_id)

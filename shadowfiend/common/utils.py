@@ -29,3 +29,15 @@ def transform_status(status):
 def format_datetime(dt):
     return '%s %s.000000' % (dt[:10], dt[11:19])
 
+
+def true_or_false(abool):
+    if isinstance(abool, bool):
+        return abool
+    elif isinstance(abool, six.string_types):
+        abool = abool.lower()
+        if abool == 'true':
+            return True
+        if abool == 'false':
+            return False
+    raise ValueError("should be bool or true/false string")
+

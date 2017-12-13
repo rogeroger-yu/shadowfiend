@@ -14,17 +14,16 @@
 #    under the License.
 
 import datetime
-import decimal
 import wsme
 from wsme import types as wtypes
 
 
 class APIBase(wtypes.Base):
     def __init__(self, **kw):
-        for key, value in kw.items():
-            if isinstance(value, datetime.datetime):
-                #kw[k] = timeutils.isotime(at=value)
-                kw[key] = value
+       # for key, value in kw.items():
+       #     if isinstance(value, datetime.datetime):
+       #         #kw[k] = timeutils.isotime(at=value)
+       #         kw[key] = value
         super(APIBase, self).__init__(**kw)
 
     def as_dict(self):
@@ -38,15 +37,25 @@ class Version(APIBase):
     version = wtypes.text
 
 
-class Test(APIBase):
-    test_text = wtypes.text
+class Summary(APIBase):
+    """Summary of one single kind of order."""
+    total_price = float
+    total_count = int
+    order_type = wtypes.text
+
+
+class Summaries(APIBase):
+    """Summary of all kind of orders."""
+    total_price = float
+    total_count = int
+    summaries = [Summary]
 
 
 class AdminAccount(APIBase):
     """Account Detail for a tenant"""
-    balance = decimal.Decimal
-    frozen_balance = decimal.Decimal
-    consumption = decimal.Decimal
+    balance = float
+    frozen_balance = float
+    consumption = float
     level = int
     user_id = wtypes.text
     project_id = wtypes.text
@@ -74,8 +83,8 @@ class User(APIBase):
 
 
 class UserAccount(APIBase):
-    balance = decimal.Decimal
-    consumption = decimal.Decimal
+    balance = float
+    consumption = float
     currency = wtypes.text
     owed = bool
     level = int
@@ -85,7 +94,7 @@ class Project(APIBase):
     user_id = wtypes.text
     project_id = wtypes.text
     domain_id = wtypes.text
-    consumption = decimal.Decimal
+    consumption = float
     created_at = wtypes.text
 
 
@@ -94,8 +103,8 @@ class UserProject(APIBase):
     project_id = wtypes.text
     domain_id = wtypes.text
     project_name = wtypes.text
-    user_consumption = decimal.Decimal
-    project_consumption = decimal.Decimal
+    user_consumption = float
+    project_consumption = float
     billing_owner = {wtypes.text: wtypes.text}
     project_owner = {wtypes.text: wtypes.text}
     project_creator = {wtypes.text: wtypes.text}
@@ -103,22 +112,10 @@ class UserProject(APIBase):
     created_at = wtypes.text
 
 
-class Summary(APIBase):
-    total_proce = decimal.Decimal
-    total_count = int
-    order_type = wtypes.text
-
-
-class Summaries(APIBase):
-    total_price = decimal.Decimal
-    total_count = int
-    summaries = [Summary]
-
-
 class Charge(APIBase):
     """Charge to account."""
     charge_id = wtypes.text
-    value = decimal.Decimal
+    value = float
     type = wtypes.text
     come_from = wtypes.text
     trading_number = wtypes.text
@@ -129,7 +126,7 @@ class Charge(APIBase):
 
 
 class Charges(APIBase):
-    total_price = decimal.Decimal
+    total_price = float
     total_count = int
     charges = [Charge]
 
@@ -137,21 +134,21 @@ class Charges(APIBase):
 class TransferMoneyBody(APIBase):
     user_id_to = wtypes.text
     user_id_from = wtypes.text
-    money = decimal.Decimal
+    money = float
     remarks = wtypes.text
 
 
 class Estimate(APIBase):
-    price_per_day = decimal.Decimal
+    price_per_day = float
     remaining_day = int
 
 
 class BalanceFrozenResult(APIBase):
     user_id = wtypes.text
     project_id = wtypes.text
-    balance = decimal.Decimal
-    frozen_balance = decimal.Decimal
+    balance = float
+    frozen_balance = float
 
 
 class BalanceFrozenBody(APIBase):
-    total_price = wsme.wsattr(decimal.Decimal, mandatory=True)
+    total_price = wsme.wsattr(float, mandatory=True)

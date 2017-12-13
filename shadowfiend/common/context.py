@@ -127,3 +127,61 @@ def set_ctx(new_ctx):
     if new_ctx:
         setattr(_CTX_STORE, _CTX_KEY, new_ctx)
         setattr(context._request_store, 'context', new_ctx)
+
+
+def get_admin_context():
+    global admin_context
+    if not admin_context:
+        admin_context = RequestContext(is_admin=True)
+    return admin_context
+
+
+def get_context_from_function_and_args(function, args, kwargs):
+    """Find an arg of type RequestContext and return it.
+
+       This is useful in a couple of decorators where we don't
+       know much about the function we're wrapping.
+    """
+
+    for arg in itertools.chain(kwargs.values(), args):
+        if isinstance(arg, RequestContext):
+            return arg
+
+    return None
+
+
+def is_user_context(context):
+    """Indicates if the request context is a normal user who doesn't bind
+    to any project or domain owner"""
+    if context.is_admin:
+        return False
+    if context.is_domain_owner:
+        return False
+    if not context.user_id:
+        return False
+    return True
+
+
+def is_domain_owner_context(context):
+    """Indicates that the context is only a domain owner"""
+    if context.is_admin:
+        return False
+    if context.is_domain_owner:
+        return True
+    return False
+
+
+def require_context(context):
+    if not context.is_admin and not context.is_domain_owner and \
+            not is_user_context(context):
+        raise exception.NotAuthorized()
+
+
+def require_admin_context(context):
+    if not context.is_admin:
+        raise exception.NotAuthorized()
+
+
+def require_domain_context(context):
+    if not context.is_admin and not context.is_domain_owner:
+        raise exception.NotAuthorized()

@@ -78,6 +78,12 @@ class ProcessorPeriodTasks(periodic_task.PeriodicTasks):
         # gnocchi fetcher
         self.gnocchi_fetcher = service.fetcher.GnocchiFetcher()
 
+        # services test fetcher
+        #self.cinder_fetcher = service.fetcher.CinderFetcher()
+        #self.nova_fetcher = service.fetcher.NovaFetcher()
+        #self.glance_fetcher = service.fetcher.GlanceFetcher()
+        self.neutron_fetcher = service.fetcher.NeutronFetcher()
+
         # DLM
         self.coord = coordination.get_coordinator(
             CONF.processor.coordination_url,
@@ -111,6 +117,15 @@ class ProcessorPeriodTasks(periodic_task.PeriodicTasks):
         #fetch billing enable tenants
         tenants = self.keystone_fetcher.get_rate_tenants()
         LOG.info("Tenants are %s" % str(tenants))
+
+        import pdb;pdb.set_trace()
+        #-----------------cinder client test---------------------------
+        #self.cinder_fetcher.get_volumes(volume_id='0296d18e-32dc-4ce8-9d37-aa98979128fe')
+        #self.nova_fetcher.flavor_list()
+        #self.glance_fetcher.image_list()
+        self.neutron_fetcher.networks_list('3427804b-70d9-4a99-9bac-39b6fbab0184')
+
+        #-----------------cinder client test---------------------------
 
         self._check_state(tenants[0])
 

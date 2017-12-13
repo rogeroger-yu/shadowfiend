@@ -1,9 +1,19 @@
 from oslo_log import log
-import oslo_messaging as messaging
+from shadowfiend.db import api as dbapi
+from shadowfiend.db import models as db_models
+
 
 LOG = log.getLogger(__name__)
 
 class Handler(object):
-    def test(self, ctxt, arg):
-        LOG.debug('Received message from RPC.')
-        return 'test rpc'
+        
+    dbapi = dbapi.get_instance()
+
+    def __init__(self):
+        super(Handler, self).__init__()
+
+    def create_account(cls, context, **kwargs):
+        LOG.debug('create account:Received message from RPC.')
+        import pdb;pdb.set_trace()
+        account = db_models.Account(**kwargs)
+        return cls.dbapi.create_account(context, account)

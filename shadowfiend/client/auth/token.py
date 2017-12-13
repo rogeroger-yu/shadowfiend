@@ -41,7 +41,7 @@ def will_expire_soon(expires, stale_duration=None):
     """
     stale_duration = (STALE_TOKEN_DURATION if stale_duration is None
                       else int(stale_duration))
-    norm_expires = timeutils.normalize_time(expires)
+    norm_expires = timeutils.nl2utc(expires)
     soon = (timeutils.utcnow() + datetime.timedelta(seconds=stale_duration))
     return norm_expires < soon
 
@@ -161,7 +161,7 @@ class TokenAuthPlugin(BaseAuthPlugin):
         except (KeyError, ValueError):
             raise exception.AuthorizationFailure(body)
 
-        self._expires_at = timeutils.parse_isotime(resp_data['expires_at'])
+        self._expires_at = timeutils.iso2dt(resp_data['expires_at'])
         self.auth_token = resp.headers['X-Subject-Token']
         self._management_url = self._get_endpoint(resp_data['catalog'],
                                                   version=self.version,
@@ -244,7 +244,8 @@ class TokenAuthPlugin(BaseAuthPlugin):
         try:
             resp = requests.post(url,
                                  data=json.dumps(body),
-                                 headers=headers)
+                                 headers=headers,
+                                 verify=False)
         except requests.exceptions.SSLError:
             msg = 'SSL exception connecting to %s' % url
             raise exception.SSLError(msg)
