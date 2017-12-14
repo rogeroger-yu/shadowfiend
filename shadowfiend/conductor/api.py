@@ -33,12 +33,12 @@ class API(rpc_service.API):
 
     def change_billing_owner(self, project_id, user_id):
         """"Change billing_owner of this project"""
-        kwargs = {'project_id': project_id,
-                'user_id': user_id}
+        kwargs = dict(project_id=project_id,
+                      user_id=user_id)
         return self._call('change_billing_owner', **kwargs)
 
     def get_billing_owner(self, context, project_id):
-        kwargs = {'project_id': project_id}
+        kwargs = dict(project_id=project_id)
         return self._call('get_billing_owner', **kwargs)
 
     def create_account(self, context, account):
@@ -48,9 +48,9 @@ class API(rpc_service.API):
         return self._call('create_project', **project)
 
     def get_project(self, context, project_id):
-        kwargs = {'project_id': project_id}
+        kwargs = dict(project_id=project_id)
         return self._call('get_project', **kwargs)
 
     def get_account(self, context, user_id):
-        kwargs = {'user_id': user_id}
+        kwargs = dict(user_id=user_id)
         return self._call('get_account', **kwargs)

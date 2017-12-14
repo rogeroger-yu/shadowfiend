@@ -1,7 +1,7 @@
 {
     "sf_admin": "role:sf_admin or role:admin",
-    "account:post": "",
+    "account:post": "rule:sf_admin or role:user",
     "context_is_admin": "",
     "context_is_domain_owner": "",
-    "account_get": ""
+    "account_get": "rule:sf_admin or role:user"
 }

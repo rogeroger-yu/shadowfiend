@@ -64,8 +64,10 @@ class Client(object):
         resp, body = self.client.get('/accounts/%s' % user_id)
         return body
 
-    def get_accounts(self, owed=None, duration=None):
+    def get_accounts(self, owed=None, limit=None, offset=None, duration=None):
         params = dict(owed=owed,
+                      limit=limit,
+                      offset=offset,
                       duration=duration)
         resp, body = self.client.get('/accounts', params=params)
         return body['accounts']

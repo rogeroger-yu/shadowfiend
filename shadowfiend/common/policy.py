@@ -15,35 +15,26 @@
 
 # Borrowed from cinder (cinder/policy.py)
 
+import six
+
 from oslo_config import cfg
 from oslo_policy import policy
-import six
+
+from shadowfiend.common import exception
 
 CONF = cfg.CONF
 
 _ENFORCER = None
 
 
-# TODO(gpocentek): provide a proper parent class to handle such exceptions
-class PolicyNotAuthorized(Exception):
-    message = "Policy doesn't allow %(action)s to be performed."
-    code = 403
-
-    def __init__(self, **kwargs):
-        self.msg = self.message % kwargs
-        super(PolicyNotAuthorized, self).__init__(self.msg)
-
-    def __unicode__(self):
-        return six.text_type(self.msg)
-
-
 def init():
     global _ENFORCER
     if not _ENFORCER:
         _ENFORCER = policy.Enforcer(CONF)
+    return _ENFORCER
 
 
-def enforce(context, action, target):
+def enforce(context, rule=None, target=None, exc=None, *args, **kwargs):
     """Verifies that the action is valid on the target in this context.
 
        :param context: shadowfiend context
@@ -60,12 +51,13 @@ def enforce(context, action, target):
        :raises PolicyNotAuthorized: if verification fails.
 
     """
-    init()
+    enforcer = init()
+    credentials = context.to_dict()
+    if not exc:
+        exc = exception.PolicyNotAuthorized
 
-    return _ENFORCER.enforce(action, target, context,
-                             do_raise=True,
-                             exc=PolicyNotAuthorized,
-                             action=action)
+    return enforcer.enforce(rule, target, credentials,
+                            do_raise=True, exc=exc, *args, **kwargs)
 
 
 def check_is_admin(roles):

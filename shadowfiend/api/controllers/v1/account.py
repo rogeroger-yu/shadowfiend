@@ -161,9 +161,8 @@ class ExistAccountController(rest.RestController):
     @wsexpose(models.UserAccount)
     def get(self):
         """Get this account."""
-        import pdb;pdb.set_trace()
         user_id = acl.get_limited_to_user(
-            HOOK.headers, 'account_get') or self._id
+            HOOK.context, 'account_get') or self._id
         return db_models.Account(**self._account(user_id=user_id))
 
     @wsexpose(None)
@@ -207,7 +206,7 @@ class ExistAccountController(rest.RestController):
             raise exception.InvalidParameterValue(err="Invalid offset")
 
         user_id = acl.get_limited_to_user(
-            HOOK.headers, 'account_charge') or self._id
+            HOOK.context, 'account_charge') or self._id
 
         charges = HOOK.conductor_rpcapi.get_charges(HOOK.context,
                                                      user_id=user_id,
@@ -240,7 +239,7 @@ class ExistAccountController(rest.RestController):
             return -1
 
         user_id = acl.get_limited_to_user(
-            HOOK.headers, 'account_estimate') or self._id
+            HOOK.context, 'account_estimate') or self._id
 
         account = self._account(user_id=user_id)
         if account.balance < 0:
@@ -275,7 +274,7 @@ class ExistAccountController(rest.RestController):
         balance can support.
         """
         user_id = acl.get_limited_to_user(
-            HOOK.headers, 'account_estimate') or self._id
+            HOOK.context, 'account_estimate') or self._id
 
         account = self._account(user_id=user_id)
         orders = HOOK.conductor_rpcapi.get_active_orders(HOOK.context,
@@ -382,7 +381,7 @@ class TransferMoneyController(rest.RestController):
         """Transfer money from one account to another.
         And only the domain owner can do the operation.
         """
-        is_domain_owner = acl.context_is_domain_owner(HOOK.headers)
+        is_domain_owner = acl.context_is_domain_owner(HOOK.context)
         if not is_domain_owner:
             raise exception.NotAuthorized()
 
