@@ -23,13 +23,9 @@ from oslo_config import cfg
 from oslo_log import log
 
 from shadowfiend.common import policy
-#from shadowfiend import exception
-#from shadowfiend import utils as gringutils
+from shadowfiend.api import acl
 from shadowfiend.api.controllers.v1 import models
 from shadowfiend.db import models as db_models
-#from shadowfiend.services import keystone
-#from shadowfiend.checker import notifier
-#from shadowfiend.openstack.common.gettextutils import _
 from shadowfiend.conductor import api as conductor_api
 
 
@@ -165,9 +161,10 @@ class ExistAccountController(rest.RestController):
     @wsexpose(models.UserAccount)
     def get(self):
         """Get this account."""
+        import pdb;pdb.set_trace()
         user_id = acl.get_limited_to_user(
-            HOOK.headers, 'account_get') or self.id
-        return models.UserAccount.from_db_model(self._account(user_id=user_id))
+            HOOK.headers, 'account_get') or self._id
+        return db_models.Account(**self._account(user_id=user_id))
 
     @wsexpose(None)
     def delete(self):

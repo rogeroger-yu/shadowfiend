@@ -50,3 +50,7 @@ class API(rpc_service.API):
     def get_project(self, context, project_id):
         kwargs = {'project_id': project_id}
         return self._call('get_project', **kwargs)
+
+    def get_account(self, context, user_id):
+        kwargs = {'user_id': user_id}
+        return self._call('get_account', **kwargs)

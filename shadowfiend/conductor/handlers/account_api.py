@@ -16,3 +16,8 @@ class Handler(object):
         LOG.debug('create account:Received message from RPC.')
         account = db_models.Account(**kwargs)
         return cls.dbapi.create_account(context, account)
+
+    def get_account(cls, context, **kwargs):
+        LOG.debug('get account:Received message from RPC.')
+        account = cls.dbapi.get_account(context, kwargs['user_id'])
+        return account

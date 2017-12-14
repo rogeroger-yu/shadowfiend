@@ -148,6 +148,14 @@ class Connection(api.Connection):
         else:
             return date
 
+    def _transfer(self, model_type):
+        model_type.balance = self._transfer_decimal2float(model_type.balance)
+        model_type.consumption = self._transfer_decimal2float(model_type.consumption)
+        model_type.created_at = self._transfer_time2str(model_type.created_at)
+        model_type.updated_at = self._transfer_time2str(model_type.updated_at)
+        model_type.deleted_at = self._transfer_time2str(model_type.deleted_at)
+
+
     @staticmethod
     def _row_to_db_product_model(row):
         return db_models.Product(product_id=row.product_id,
@@ -1159,7 +1167,7 @@ class Connection(api.Connection):
             account_ref = sa_models.Account()
             account_ref.update(account.as_dict())
             session.add(account_ref)
-        account_ref.created_at = self._transfer_time2str(account_ref.created_at)
+        self._transfer(account_ref)
         return self._row_to_db_account_model(account_ref).__dict__
 
     @require_context
@@ -1171,10 +1179,11 @@ class Connection(api.Connection):
             query = get_session().query(sa_models.Account).\
                 filter_by(user_id=user_id)
         try:
-            ref = query.one()
+            account_ref = query.one()
         except NoResultFound:
             raise exception.AccountNotFound(user_id=user_id)
-        return self._row_to_db_account_model(ref)
+        self._transfer(account_ref)
+        return self._row_to_db_account_model(account_ref).__dict__
 
     @oslo_db_api.wrap_db_retry(max_retries=5, retry_on_deadlock=True,
                                retry_on_request=True)
@@ -1472,11 +1481,7 @@ class Connection(api.Connection):
         except NoResultFound:
             raise exception.AccountNotFound(user_id=project.user_id)
 
-        account.balance = self._transfer_decimal2float(account.balance)
-        account.consumption = self._transfer_decimal2float(account.consumption)
-        account.created_at = self._transfer_time2str(account.created_at)
-        account.updated_at = self._transfer_time2str(account.updated_at)
-        account.deleted_at = self._transfer_time2str(account.deleted_at)
+        self._transfer(account)
         return self._row_to_db_account_model(account).__dict__
 
     @require_admin_context

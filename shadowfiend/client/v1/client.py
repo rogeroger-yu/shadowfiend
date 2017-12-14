@@ -60,5 +60,12 @@ class Client(object):
     def get_order_by_resource_id():
         pass
 
-    def get_account():
-        pass
+    def get_account(self, user_id):
+        resp, body = self.client.get('/accounts/%s' % user_id)
+        return body
+
+    def get_accounts(self, owed=None, duration=None):
+        params = dict(owed=owed,
+                      duration=duration)
+        resp, body = self.client.get('/accounts', params=params)
+        return body['accounts']

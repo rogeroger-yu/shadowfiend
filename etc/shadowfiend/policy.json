@@ -1,6 +1,7 @@
 {
-    "uos_admin": "role:uos_admin or role:admin",
+    "sf_admin": "role:sf_admin or role:admin",
     "account:post": "",
     "context_is_admin": "",
-    "context_is_domain_owner": ""
+    "context_is_domain_owner": "",
+    "account_get": ""
 }

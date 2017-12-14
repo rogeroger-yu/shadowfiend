@@ -249,7 +249,7 @@ class BillingProtocol(object):
                     return app_result
 
                 # normal user can't delete resoruces billed by month/year
-                admin_roles = ['admin', 'uos_admin']
+                admin_roles = ['admin', 'sf_admin']
                 if not any(role in admin_roles for role in roles):
                     return self._reject_request_403(env, start_response)
 
