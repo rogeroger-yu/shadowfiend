@@ -73,7 +73,26 @@ def setup_app(config=None):
     app = pecan.make_app(
         app_conf.pop('root'),
         logging=getattr(config, 'logging', {}),
-        **app_conf
+        debug=config.app.debug,
+        hooks=config.app.hooks
+    )
+
+    return app
+
+
+def setup_noauth_app(config=None):
+
+    if not config:
+        config = get_pecan_config()
+
+    app_conf = dict(config.app)
+    common_config.set_middleware_defaults()
+
+    app = pecan.make_app(
+        app_conf.pop('noauth_root'),
+        logging=getattr(config, 'logging', {}),
+        debug=config.app.debug,
+        hooks=config.app.hooks
     )
 
     return app
@@ -125,3 +144,6 @@ def build_server():
 
 def app_factory(global_config, **local_conf):
     return setup_app()
+
+def noauth_app_factory(global_config, **local_conf):
+    return setup_noauth_app()

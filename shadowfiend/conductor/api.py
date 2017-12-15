@@ -31,7 +31,7 @@ class API(rpc_service.API):
         super(API, self).__init__(transport, context,
                                   topic=cfg.CONF.conductor.topic)
 
-    def change_billing_owner(self, project_id, user_id):
+    def change_billing_owner(self, context, project_id, user_id):
         """"Change billing_owner of this project"""
         kwargs = dict(project_id=project_id,
                       user_id=user_id)

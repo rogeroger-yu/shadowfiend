@@ -19,6 +19,7 @@ import os
 
 from decimal import Decimal
 from oslo_config import cfg
+from oslo_log import log
 from oslo_db import api as oslo_db_api
 from oslo_db import exception as db_exc
 from oslo_db.sqlalchemy import session as db_session
@@ -39,6 +40,7 @@ from shadowfiend.db import models as db_models
 from shadowfiend.db.sqlalchemy import migration
 from shadowfiend.db.sqlalchemy import models as sa_models
 
+LOG = log.getLogger(__name__)
 CONF = cfg.CONF
 
 
@@ -1654,7 +1656,7 @@ class Connection(api.Connection):
             # add/update relationship between user and project
             try:
                 user_project = model_query(
-                    context, sa_models.UserProject, session=session).\
+                    context, sa_models.UsrPrjRelation, session=session).\
                     filter_by(user_id=user_id).\
                     filter_by(project_id=project_id).\
                     one()
@@ -1663,15 +1665,15 @@ class Connection(api.Connection):
                 filters.append('user_id')
                 filters.append('project_id')
                 self._compare_and_swap(model_query(context,
-                                                   sa_models.UserProject,
+                                                   sa_models.UsrPrjRelation,
                                                    session=session),
                                        user_project, filters, params,
                                        exception.UserProjectUpdateFailed())
             except NoResultFound:
-                session.add(sa_models.UserProject(user_id=user_id,
-                                                  project_id=project_id,
-                                                  consumption='0',
-                                                  domain_id=project.domain_id))
+                session.add(sa_models.UsrPrjRelation(user_id=user_id,
+                                                     project_id=project_id,
+                                                     consumption='0',
+                                                     domain_id=project.domain_id))
 
     def _check_if_account_charged(self, account, order):
         if not account.owed and order.owed:

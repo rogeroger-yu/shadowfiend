@@ -22,7 +22,7 @@ from shadowfiend.api.controllers.noauth import project
 from shadowfiend.api.controllers.v1 import models
 
 
-class NoAuthController(rest.RestController):
+class NoauthController(rest.RestController):
     accounts = account.AccountController()
     projects = project.ProjectController()
 
