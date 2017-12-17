@@ -62,3 +62,8 @@ class API(rpc_service.API):
     def delete_account(self, context, user_id):
         kwargs = dict(user_id=user_id)
         return self._call('delete_account', **kwargs)
+
+    def change_account_level(self, context, user_id, level):
+        kwargs = dict(user_id=user_id,
+                      level=level)
+        return self._call('change_account_level', **kwargs)

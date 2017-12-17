@@ -4,5 +4,6 @@
     "context_is_admin": "",
     "context_is_domain_owner": "",
     "account_get": "rule:sf_admin or role:user",
-    "account_delete": "rule:sf_admin or role:user"
+    "account_delete": "rule:sf_admin or role:user",
+    "account:level": "rule:sf_admin or role:user"
 }

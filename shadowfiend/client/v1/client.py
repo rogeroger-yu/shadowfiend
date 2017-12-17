@@ -79,3 +79,7 @@ class Client(object):
     def delete_account(self, user_id):
         resp, body = self.client.delete('/accounts/%s' % user_id)
         return body
+
+    def change_account_level(self, user_id, level):
+        _body = dict(level=level)
+        self.client.put('/accounts/%s/level' % user_id, body=_body)

@@ -61,8 +61,7 @@ class ExistAccountController(rest.RestController):
             raise exception.AccountGetFailed(user_id=_id)
         return account
 
-    #@wsexpose(models.Charge, wtypes.text, body=models.Charge)
-    @wsexpose(None, wtypes.text, body=None)
+    @wsexpose(models.Charge, wtypes.text, body=models.Charge)
     def put(self, data):
         """Charge the account."""
         check_policy(HOOK.context, "account:charge")
@@ -178,11 +177,10 @@ class ExistAccountController(rest.RestController):
         except Exception:
             LOG.ERROR('Fail to create account: %s' % data.as_dict())
 
-    #@wsexpose(models.UserAccount, int)
-    @wsexpose(None, int)
+    @wsexpose(models.UserAccount, int)
     def level(self, level):
         """Update the account's level."""
-        check_policy(HOOK.context, "account:level")
+        policy.check_policy(HOOK.context, "account:level")
 
         if not isinstance(level, int) or level < 0 or level > 9:
             raise exception.InvalidParameterValue(err="Invalid Level")
@@ -193,7 +191,7 @@ class ExistAccountController(rest.RestController):
             LOG.ERROR('Fail to change the account level of: %s' % self._id)
             raise exception.DBError(reason=e)
 
-        return models.UserAccount.from_db_model(account)
+        return models.UserAccount(**account)
 
     @wsexpose(models.Charges, wtypes.text, datetime.datetime,
               datetime.datetime, int, int)

@@ -25,3 +25,9 @@ class Handler(object):
     def delete_account(cls, context, **kwargs):
         LOG.debug('delete account:Received message from RPC.')
         cls.dbapi.delete_account(context, kwargs['user_id'])
+
+    def change_account_level(cls, context, **kwargs):
+        LOG.debug('change account level:Received message from RPC.')
+        return cls.dbapi.change_account_level(context,
+                                              kwargs['user_id'],
+                                              kwargs['level'])

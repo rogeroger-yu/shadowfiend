@@ -1280,7 +1280,8 @@ class Connection(api.Connection):
                                    account, filters, params,
                                    exception.AccountUpdateFailed())
 
-        return self._row_to_db_account_model(account)
+        self._transfer(account)
+        return self._row_to_db_account_model(account).__dict__
 
     @oslo_db_api.wrap_db_retry(max_retries=5, retry_on_deadlock=True,
                                retry_on_request=True)
