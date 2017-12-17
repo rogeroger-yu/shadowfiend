@@ -14,8 +14,7 @@
 #    under the License.
 
 from pecan import rest
-
-from shadowfiend.api import expose
+from wsmeext.pecan import wsexpose
 
 from shadowfiend.api.controllers.v1 import account
 from shadowfiend.api.controllers.v1 import project
@@ -33,6 +32,6 @@ class V1Controller(rest.RestController):
 #    charges = charge.ChargeController()
 #    orders = order.OrderController()
 
-    @expose.expose(models.Version)
+    @wsexpose(models.Version)
     def get(self):
         return models.Version(version='1.0.0')

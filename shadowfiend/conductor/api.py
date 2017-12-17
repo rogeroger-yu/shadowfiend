@@ -41,9 +41,6 @@ class API(rpc_service.API):
         kwargs = dict(project_id=project_id)
         return self._call('get_billing_owner', **kwargs)
 
-    def create_account(self, context, account):
-        return self._call('create_account', **account)
-
     def create_project(self, context, project):
         return self._call('create_project', **project)
 
@@ -51,6 +48,17 @@ class API(rpc_service.API):
         kwargs = dict(project_id=project_id)
         return self._call('get_project', **kwargs)
 
+    def delete_project(self, context, project_id):
+        kwargs = dict(project_id=project_id)
+        return self._call('delete_project', **kwargs)
+
     def get_account(self, context, user_id):
         kwargs = dict(user_id=user_id)
         return self._call('get_account', **kwargs)
+
+    def create_account(self, context, account):
+        return self._call('create_account', **account)
+
+    def delete_account(self, context, user_id):
+        kwargs = dict(user_id=user_id)
+        return self._call('delete_account', **kwargs)

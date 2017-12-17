@@ -21,3 +21,7 @@ class Handler(object):
         LOG.debug('get account:Received message from RPC.')
         account = cls.dbapi.get_account(context, kwargs['user_id'])
         return account
+
+    def delete_account(cls, context, **kwargs):
+        LOG.debug('delete account:Received message from RPC.')
+        cls.dbapi.delete_account(context, kwargs['user_id'])

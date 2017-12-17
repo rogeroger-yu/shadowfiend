@@ -35,16 +35,6 @@ class Client(object):
                                     timeout=timeout,
                                     *args, **kwargs)
 
-    def create_account(self, user_id, domain_id, balance,
-                       consumption, level, **kwargs):
-        _body = dict(user_id=user_id,
-                     domain_id=domain_id,
-                     balance=balance,
-                     consumption=consumption,
-                     level=level,
-                     **kwargs)
-        self.client.post('/accounts', body=_body)
-
     def get_billing_owner(self, project_id):
         resp, body = self.client.get('/projects/%s/billing_owner' %
                                      project_id)
@@ -56,6 +46,10 @@ class Client(object):
                      domain_id=domain_id,
                      consumption=consumption)
         self.client.post('/projects', body=_body)
+
+    def get_project(self, project_id):
+        resp, body = self.client.get('/projects/%s' % project_id)
+        return body
 
     def get_order_by_resource_id():
         pass
@@ -71,3 +65,17 @@ class Client(object):
                       duration=duration)
         resp, body = self.client.get('/accounts', params=params)
         return body['accounts']
+
+    def create_account(self, user_id, domain_id, balance,
+                       consumption, level, **kwargs):
+        _body = dict(user_id=user_id,
+                     domain_id=domain_id,
+                     balance=balance,
+                     consumption=consumption,
+                     level=level,
+                     **kwargs)
+        self.client.post('/accounts', body=_body)
+
+    def delete_account(self, user_id):
+        resp, body = self.client.delete('/accounts/%s' % user_id)
+        return body

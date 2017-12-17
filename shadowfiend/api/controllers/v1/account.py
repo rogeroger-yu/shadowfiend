@@ -22,11 +22,12 @@ from wsmeext.pecan import wsexpose
 from oslo_config import cfg
 from oslo_log import log
 
-from shadowfiend.common import policy
 from shadowfiend.api import acl
 from shadowfiend.api.controllers.v1 import models
 from shadowfiend.db import models as db_models
 from shadowfiend.conductor import api as conductor_api
+from shadowfiend.common import policy
+from shadowfiend.common import exception
 
 
 LOG = log.getLogger(__name__)
@@ -170,8 +171,8 @@ class ExistAccountController(rest.RestController):
         """Delete the account including the projects that belong to it."""
         policy.check_policy(HOOK.context, "account:delete")
         try:
-            repsonse = HOOK.conductor_rpcapi.delete_account(**data.as_dict())
-            return response
+            HOOK.conductor_rpcapi.delete_account(HOOK.context,
+                                                 self._id)
         except (exception.NotFound):
             msg = _('Could not find account whose user_id is %s' % self._id)
         except Exception:
@@ -398,16 +399,13 @@ class AccountController(rest.RestController):
     def _lookup(self, user_id, *remainder):
         if remainder and not remainder[-1]:
             remainder = remainder[:-1]
-        _correct = len(user_id) == 32 or len(user_id) == 64
-        if _correct:
-            return ExistAccountController(user_id), remainder
+        return ExistAccountController(user_id), remainder
 
     @wsexpose(None, body=models.AdminAccount)
     def post(self, data):
         """Create a new account."""
         policy.check_policy(HOOK.context, "account:post")
         try:
-            #account = db_models.Account(**data.as_dict())
             account = data.as_dict()
             response = HOOK.conductor_rpcapi.create_account(HOOK.context,
                                                             account)

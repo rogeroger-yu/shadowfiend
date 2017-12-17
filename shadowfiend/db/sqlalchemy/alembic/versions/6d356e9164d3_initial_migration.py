@@ -124,5 +124,5 @@ def upgrade():
         mysql_charset='utf8',
     )
     op.create_index('ix_order_user_id_project_id', 'order', ['user_id', 'project_id'])
-    op.create_unique_constraint('uq_order_resource_id', 'order', ['resource_id'])
+    op.create_unique_constraint('uq_order_resource_id', 'order', ['order_id', 'resource_id'])
 

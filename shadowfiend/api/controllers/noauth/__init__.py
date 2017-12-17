@@ -14,8 +14,7 @@
 #    under the License.
 
 from pecan import rest
-
-from shadowfiend.api import expose
+from wsmeext.pecan import wsexpose
 
 from shadowfiend.api.controllers.noauth import account
 from shadowfiend.api.controllers.noauth import project
@@ -26,6 +25,6 @@ class NoauthController(rest.RestController):
     accounts = account.AccountController()
     projects = project.ProjectController()
 
-    @expose.expose(models.Version)
+    @wsexpose(models.Version)
     def get(self):
         return models.Version(version='noauth')

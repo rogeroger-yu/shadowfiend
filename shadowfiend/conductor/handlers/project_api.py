@@ -27,3 +27,7 @@ class Handler(object):
         LOG.debug('Conductor Function: get_project.')
         project = cls.dbapi.get_project(context, kwargs['project_id'])
         return project
+
+    def delete_project(cls, context, **kwargs):
+        LOG.debug('Conductor Function: delete_project.')
+        cls.dbapi.delete_project(context, kwargs['project_id'])

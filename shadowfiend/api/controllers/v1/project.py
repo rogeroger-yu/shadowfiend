@@ -69,10 +69,19 @@ class ExistProjectController(rest.RestController):
             return (BillingOwnerController(self._id),
                     remainder)
 
+    def _project(self):
+        try:
+            project = HOOK.conductor_rpcapi.get_project(HOOK.context,
+                                                        project_id=self._id)
+        except Exception as e:
+            LOG.error('project %s no found' % self._id)
+            raise exception.ProjectNotFound(project_id=self._id)
+        return project
+
     @wsexpose(models.Project)
     def get(self):
         """Return this project."""
-        pass
+        return db_models.Project(**self._project())
 
     @wsexpose(models.Summaries, wtypes.text)
     def estimate(self, region_id=None):
