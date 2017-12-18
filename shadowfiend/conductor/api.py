@@ -67,3 +67,30 @@ class API(rpc_service.API):
         kwargs = dict(user_id=user_id,
                       level=level)
         return self._call('change_account_level', **kwargs)
+
+    def update_account(self, context, user_id, operator, **data):
+        kwargs = dict(user_id=user_id,
+                      operator=operator,
+                      **data)
+        return self._call('update_account', **kwargs)
+
+    def get_charges(self, context, user_id=None, project_id=None, type=None,
+                    start_time=None, end_time=None,
+                    limit=None, offset=None, sort_key=None, sort_dir=None):
+        kwargs = dict(user_id=user_id,
+                      project_id=project_id,
+                      type=type,
+                      start_time=start_time,
+                      end_time=end_time,
+                      limit=limit,
+                      offset=offset,
+                      sort_key=sort_key)
+        return self._call('get_charges', **kwargs)
+
+    def get_charges_price_and_count(self, context, user_id=None, type=None,
+                                    start_time=None, end_time=None):
+        kwargs = dict(user_id=user_id,
+                      type=type,
+                      start_time=start_time,
+                      end_time=end_time)
+        return self._call('get_charges_price_and_count', **kwargs)

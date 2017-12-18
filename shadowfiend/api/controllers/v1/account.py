@@ -16,6 +16,7 @@ import datetime
 import json
 
 import pecan
+import wsme
 from pecan import rest
 from wsme import types as wtypes
 from wsmeext.pecan import wsexpose
@@ -64,17 +65,12 @@ class ExistAccountController(rest.RestController):
     @wsexpose(models.Charge, wtypes.text, body=models.Charge)
     def put(self, data):
         """Charge the account."""
-        check_policy(HOOK.context, "account:charge")
+        policy.check_policy(HOOK.context, "account:charge")
 
-        # check uos_bill_account_charge_limited charge value
-        if "uos_bill_account_charge_limited" in HOOK.context.roles:
-            lscv = int(cfg.CONF.limited_support_charge_value)
-            if data.value < -lscv or data.value > lscv:
-                raise exception.InvalidChargeValue(value=data.value)
-        else:  # check accountant charge value
-            lacv = int(cfg.CONF.limited_accountant_charge_value)
-            if data.value < -lacv or data.value > lacv:
-                raise exception.InvalidChargeValue(value=data.value)
+        # check accountant charge value
+        lacv = int(cfg.CONF.limited_accountant_charge_value)
+        if data.value < -lacv or data.value > lacv:
+            raise exception.InvalidChargeValue(value=data.value)
 
         remarks = data.remarks if data.remarks != wsme.Unset else None
         operator = HOOK.context.user_id
@@ -85,77 +81,31 @@ class ExistAccountController(rest.RestController):
                                    self._id,
                                    operator=operator,
                                    **data.as_dict())
-            has_bonus = False
-            if cfg.CONF.enable_bonus and data['type'] != 'bonus':
-                value = gringutils.calculate_bonus(data['value'])
-                if value > 0:
-                    bonus, _ = HOOK.conductor_rpcapi.\
-                            update_account(HOOK.context,
-                                           self._id,
-                                           type='bonus',
-                                           value=value,
-                                           come_from='system',
-                                           operator=operator,
-                                           remarks=remarks)
-                    has_bonus = True
 
-            if cfg.CONF.enable_invitation and is_first_charge:
-                _account = self._account()
-                min_charge_value = gringutils._quantize_decimal(
-                    cfg.CONF.min_charge_value)
-                reward_value = gringutils._quantize_decimal(
-                    cfg.CONF.reward_value)
-
-                if _account.inviter \
-                        and data.value >= min_charge_value \
-                        and reward_value > 0:
-                    remarks = "reward because of invitation"
-                    HOOK.conductor_rpcapi.update_account(HOOK.context,
-                                                         _account.inviter,
-                                                         type='bonus',
-                                                         value=reward_value,
-                                                         come_from='system',
-                                                         operator=operator,
-                                                         remarks=remarks,
-                                                         invitee=self._id)
-                    if cfg.CONF.notify_account_charged:
-                        inviter = HOOK.conductor_rpcapi.\
-                                get_account(HOOK.context,
-                                            _account.inviter).as_dict()
-                        contact = kunkka.get_uos_user(inviter['user_id'])
-                        self.notifier = notifier.NotifierService(
-                            cfg.CONF.checker.notifier_level)
-                        self.notifier.notify_account_charged(
-                            HOOK.context, inviter, contact,
-                            'bonus', reward_value, bonus=0,
-                            operator=operator,
-                            operator_name=HOOK.context.user_name,
-                            remarks="reward because of invitation")
-            HOOK.conductor_rpcapi.set_charged_orders(HOOK.context, self._id)
         except exception.NotAuthorized as e:
-            LOG.ERROR('Fail to charge the account:%s '
+            LOG.error('Fail to charge the account:%s '
                           'due to not authorization' % self._id)
             raise exception.NotAuthorized()
         except Exception as e:
-            LOG.ERROR('Fail to charge the account:%s, '
+            LOG.error('Fail to charge the account:%s, '
                           'charge value: %s' % (self._id, data.value))
             raise exception.DBError(reason=e)
-        else:
-            # Notifier account
-            if cfg.CONF.notify_account_charged:
-                account = HOOK.conductor_rpcapi.get_account(HOOK.context,
-                                                            self._id).as_dict()
-                contact = kunkka.get_uos_user(account['user_id'])
-                language = cfg.CONF.notification_language
-                self.notifier = notifier.NotifierService(
-                    cfg.CONF.checker.notifier_level)
-                self.notifier.notify_account_charged(
-                    HOOK.context, account, contact,
-                    data['type'], charge.value,
-                    bonus=bonus.value if has_bonus else 0,
-                    operator=operator,
-                    operator_name=HOOK.context.user_name,
-                    remarks=remarks, language=language)
+        #else:
+        #    # Notifier account
+        #    if cfg.CONF.notify_account_charged:
+        #        account = HOOK.conductor_rpcapi.get_account(HOOK.context,
+        #                                                    self._id).as_dict()
+        #        contact = kunkka.get_uos_user(account['user_id'])
+        #        language = cfg.CONF.notification_language
+        #        self.notifier = notifier.NotifierService(
+        #            cfg.CONF.checker.notifier_level)
+        #        self.notifier.notify_account_charged(
+        #            HOOK.context, account, contact,
+        #            data['type'], charge.value,
+        #            bonus=bonus.value if has_bonus else 0,
+        #            operator=operator,
+        #            operator_name=HOOK.context.user_name,
+        #            remarks=remarks, language=language)
         return models.Charge.from_db_model(charge)
 
     @wsexpose(models.UserAccount)
@@ -175,7 +125,7 @@ class ExistAccountController(rest.RestController):
         except (exception.NotFound):
             msg = _('Could not find account whose user_id is %s' % self._id)
         except Exception:
-            LOG.ERROR('Fail to create account: %s' % data.as_dict())
+            LOG.error('Fail to create account: %s' % data.as_dict())
 
     @wsexpose(models.UserAccount, int)
     def level(self, level):
@@ -188,7 +138,7 @@ class ExistAccountController(rest.RestController):
             account = HOOK.conductor_rpcapi.change_account_level(
                 HOOK.context, self._id, level)
         except Exception as e:
-            LOG.ERROR('Fail to change the account level of: %s' % self._id)
+            LOG.error('Fail to change the account level of: %s' % self._id)
             raise exception.DBError(reason=e)
 
         return models.UserAccount(**account)
@@ -208,15 +158,15 @@ class ExistAccountController(rest.RestController):
             HOOK.headers, 'account_charge') or self._id
 
         charges = HOOK.conductor_rpcapi.get_charges(HOOK.context,
-                                                     user_id=user_id,
-                                                     type=type,
-                                                     limit=limit,
-                                                     offset=offset,
-                                                     start_time=start_time,
-                                                     end_time=end_time)
+                                                    user_id=user_id,
+                                                    type=type,
+                                                    limit=limit,
+                                                    offset=offset,
+                                                    start_time=start_time,
+                                                    end_time=end_time)
         charges_list = []
         for charge in charges:
-            charges_list.append(models.Charge.from_db_model(charge))
+            charges_list.append(models.Charge(**charge))
 
         total_price, total_count = HOOK.conductor_rpcapi.\
                 get_charges_price_and_count(HOOK.context,
@@ -224,7 +174,6 @@ class ExistAccountController(rest.RestController):
                                             type=type,
                                             start_time=start_time,
                                             end_time=end_time)
-        total_price = gringutils._quantize_decimal(total_price)
 
         return models.Charges.transform(total_price=total_price,
                                         total_count=total_count,
@@ -409,7 +358,7 @@ class AccountController(rest.RestController):
                                                             account)
             return response
         except Exception:
-            LOG.ERROR('Fail to create account: %s' % data.as_dict())
+            LOG.error('Fail to create account: %s' % data.as_dict())
 
     @wsexpose(models.UserAccount, bool, int, int, wtypes.text)
     def get_all(self, owed=None, limit=None, offset=None):

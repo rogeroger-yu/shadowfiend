@@ -83,3 +83,13 @@ class Client(object):
     def change_account_level(self, user_id, level):
         _body = dict(level=level)
         self.client.put('/accounts/%s/level' % user_id, body=_body)
+
+    def update_account(self, **kwargs):
+        user_id = kwargs.pop('user_id')
+        self.client.put('/accounts/%s' % user_id, body=kwargs)
+
+    def get_charges(self, user_id):
+        resp, body = self.client.get('/accounts/%s/charges' % user_id)
+        if body:
+            return body['charges']
+        return []

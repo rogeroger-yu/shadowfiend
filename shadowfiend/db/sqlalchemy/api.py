@@ -119,6 +119,68 @@ def model_query(context, model, *args, **kwargs):
     return query
 
 
+def paginate_query(context, model, limit=None, offset=None,
+                   sort_key=None, sort_dir=None, query=None):
+    if not query:
+        query = model_query(context, model)
+    sort_keys = ['id']
+    # support for multiple sort_key
+    keys = []
+    if sort_key:
+        keys = sort_key.split(',')
+    for k in keys:
+        k = k.strip()
+        if k and k not in sort_keys:
+            sort_keys.insert(0, k)
+    query = _paginate_query(query, model, limit, sort_keys,
+                            offset=offset, sort_dir=sort_dir)
+    return query.all()
+
+
+def _paginate_query(query, model, limit, sort_keys, offset=None,
+                    sort_dir=None, sort_dirs=None):
+    if 'id' not in sort_keys:
+        # TODO(justinsb): If this ever gives a false-positive, check
+        # the actual primary key, rather than assuming its id
+        LOG.warn('Id not in sort_keys; is sort_keys unique?')
+
+    assert(not (sort_dir and sort_dirs))
+
+    # Default the sort direction to ascending
+    if sort_dirs is None and sort_dir is None:
+        sort_dir = 'desc'
+
+    # Ensure a per-column sort direction
+    if sort_dirs is None:
+        sort_dirs = [sort_dir for _sort_key in sort_keys]
+
+    assert(len(sort_dirs) == len(sort_keys))
+
+    # Add sorting
+    for current_sort_key, current_sort_dir in zip(sort_keys, sort_dirs):
+        try:
+            sort_dir_func = {
+                'asc': asc,
+                'desc': desc,
+            }[current_sort_dir]
+        except KeyError:
+            raise ValueError("Unknown sort direction, "
+                             "must be 'desc' or 'asc'")
+        try:
+            sort_key_attr = getattr(model, current_sort_key)
+        except AttributeError:
+            raise exception.Invalid()
+        query = query.order_by(sort_dir_func(sort_key_attr))
+
+    if offset is not None:
+        query = query.offset(offset)
+
+    if limit is not None:
+        query = query.limit(limit)
+
+    return query
+
+
 class Connection(api.Connection):
     """SqlAlchemy connection."""
 
@@ -151,11 +213,21 @@ class Connection(api.Connection):
             return date
 
     def _transfer(self, model_type):
-        model_type.balance = self._transfer_decimal2float(model_type.balance)
-        model_type.consumption = self._transfer_decimal2float(model_type.consumption)
-        model_type.created_at = self._transfer_time2str(model_type.created_at)
-        model_type.updated_at = self._transfer_time2str(model_type.updated_at)
-        model_type.deleted_at = self._transfer_time2str(model_type.deleted_at)
+        model_type.value = self._transfer_decimal2float(
+            model_type.value if hasattr(model_type,'value') else None)
+        model_type.balance = self._transfer_decimal2float(
+            model_type.balance if hasattr(model_type,'balance') else None)
+        model_type.consumption = self._transfer_decimal2float(
+            model_type.consumption if hasattr(model_type,'consumption') else None)
+
+        model_type.charge_time = self._transfer_time2str(
+            model_type.charge_time if hasattr(model_type,'charge_time') else None)
+        model_type.created_at = self._transfer_time2str(
+            model_type.created_at if hasattr(model_type,'created_at') else None)
+        model_type.updated_at = self._transfer_time2str(
+            model_type.updated_at if hasattr(model_type,'updated_at') else None)
+        model_type.deleted_at = self._transfer_time2str(
+            model_type.deleted_at if hasattr(model_type,'deleted_at') else None)
 
 
     @staticmethod
@@ -1267,9 +1339,9 @@ class Connection(api.Connection):
     def change_account_level(self, context, user_id, level, project_id=None):
         session = get_session()
         with session.begin():
-            account = session.query(sa_models.Account).\
-                filter_by(user_id=user_id).\
-                one()
+            account_ref = session.query(sa_models.Account).\
+                    filter_by(user_id=user_id).\
+                    one()
             params = {'level': level}
             filters = params.keys()
             filters.append('user_id')
@@ -1277,11 +1349,11 @@ class Connection(api.Connection):
             self._compare_and_swap(model_query(context,
                                                sa_models.Account,
                                                session=session),
-                                   account, filters, params,
+                                   account_ref, filters, params,
                                    exception.AccountUpdateFailed())
 
-        self._transfer(account)
-        return self._row_to_db_account_model(account).__dict__
+        self._transfer(account_ref)
+        return self._row_to_db_account_model(account_ref).__dict__
 
     @oslo_db_api.wrap_db_retry(max_retries=5, retry_on_deadlock=True,
                                retry_on_request=True)
@@ -1294,15 +1366,10 @@ class Connection(api.Connection):
             account = session.query(sa_models.Account).\
                 filter_by(user_id=user_id).\
                 one()
-            account.balance += data['value']
+            account.balance += Decimal(data['value'])
 
             if account.balance >= 0:
                 account.owed = False
-
-            is_first_charge = False
-            if data.get('type') == 'money' and not account.charged:
-                account.charged = True
-                is_first_charge = True
 
             # add charge records
             if not data.get('charge_time'):
@@ -1310,7 +1377,7 @@ class Connection(api.Connection):
             else:
                 charge_time = timeutils.parse_isotime(data['charge_time'])
 
-            charge = sa_models.Charge(charge_id=uuidutils.generate_uuid(),
+            charge_ref = sa_models.Charge(charge_id=uuidutils.generate_uuid(),
                                       user_id=account.user_id,
                                       domain_id=account.domain_id,
                                       value=data['value'],
@@ -1321,15 +1388,10 @@ class Connection(api.Connection):
                                       charge_time=charge_time,
                                       operator=operator,
                                       remarks=data.get('remarks'))
-            session.add(charge)
+            session.add(charge_ref)
 
-            if data.get('invitee'):
-                invitee = session.query(sa_models.Account).\
-                    filter_by(user_id=data.get('invitee')).\
-                    one()
-                invitee.reward_value = data['value']
-
-        return self._row_to_db_charge_model(charge), is_first_charge
+        self._transfer(charge_ref)
+        return self._row_to_db_charge_model(charge_ref).__dict__
 
     @require_admin_context
     @oslo_db_api.wrap_db_retry(max_retries=5, retry_on_deadlock=True,
@@ -1435,7 +1497,11 @@ class Connection(api.Connection):
                                 sort_key=sort_key, sort_dir=sort_dir,
                                 query=query)
 
-        return (self._row_to_db_charge_model(r) for r in result)
+        charges = []
+        for r in result:
+            self._transfer(r)
+            charges.append(self._row_to_db_charge_model(r).__dict__)
+        return charges
 
     def get_charges_price_and_count(self, context, user_id=None,
                                     project_id=None, type=None,
@@ -1458,7 +1524,7 @@ class Connection(api.Connection):
             query = query.filter(sa_models.Charge.charge_time >= start_time,
                                  sa_models.Charge.charge_time < end_time)
 
-        return query.one().sum or 0, query.one().count or 0
+        return self._transfer_decimal2float(query.one().sum) or 0, query.one().count or 0
 
     def create_project(self, context, project):
         session = get_session()
@@ -1479,13 +1545,13 @@ class Connection(api.Connection):
             raise exception.ProjectNotFound(project_id=project_id)
 
         try:
-            account = model_query(context, sa_models.Account).\
+            account_ref = model_query(context, sa_models.Account).\
                 filter_by(user_id=project.user_id).one()
         except NoResultFound:
             raise exception.AccountNotFound(user_id=project.user_id)
 
-        self._transfer(account)
-        return self._row_to_db_account_model(account).__dict__
+        self._transfer(account_ref)
+        return self._row_to_db_account_model(account_ref).__dict__
 
     @require_admin_context
     @oslo_db_api.wrap_db_retry(max_retries=5, retry_on_deadlock=True,

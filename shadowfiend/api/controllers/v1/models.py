@@ -28,13 +28,16 @@ class APIBase(wtypes.Base):
 
     @classmethod
     def from_db_model(cls, m):
-        return cls(**(m.as_dict()))
+        return cls(**(m))
+
+    @classmethod
+    def transform(cls, **kwargs):
+        return cls(**kwargs)
 
     def as_dict(self):
         return dict((k.name, getattr(self, k.name))
                     for k in wtypes.inspect_class(self.__class__)
                     if getattr(self, k.name) != wsme.Unset)
-
 
 
 class Version(APIBase):
