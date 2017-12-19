@@ -27,8 +27,10 @@ from shadowfiend.api import acl
 from shadowfiend.api.controllers.v1 import models
 from shadowfiend.db import models as db_models
 from shadowfiend.conductor import api as conductor_api
-from shadowfiend.common import policy
 from shadowfiend.common import exception
+from shadowfiend.common import policy
+from shadowfiend.common import utils as shadowutils
+from shadowfiend.services import kunkka
 
 
 LOG = log.getLogger(__name__)
@@ -360,8 +362,8 @@ class AccountController(rest.RestController):
         except Exception:
             LOG.error('Fail to create account: %s' % data.as_dict())
 
-    @wsexpose(models.UserAccount, bool, int, int, wtypes.text)
-    def get_all(self, owed=None, limit=None, offset=None):
+    @wsexpose(models.AdminAccounts, bool, int, int, wtypes.text)
+    def get_all(self, owed=None, limit=None, offset=None, duration=None):
         """Get this account."""
         policy.check_policy(HOOK.context, "account:all")
 
@@ -370,22 +372,32 @@ class AccountController(rest.RestController):
         if offset and offset < 0:
             raise exception.InvalidParameterValue(err="Invalid offset")
 
+        duration = shadowutils.normalize_timedelta(duration) 
+        if duration:
+            active_from = dateetime.datetime.utcnow() - duration
+        else:
+            active_from = None
+
         try:
             accounts = HOOK.conductor_rpcapi.get_accounts(HOOK.context,
-                                                          **data.as_dict())
+                                                          owed=owed,
+                                                          limit=limit,
+                                                          offset=offset,
+                                                          active_from=active_from)
             count = HOOK.conductor_rpcapi.get_accounts_count(HOOK.context,
-                                                             **data.as_dict())
+                                                             owed=owed,
+                                                             active_from=active_from)
         except exception.NotAuthorized as e:
-            LOG.ERROR('Failed to get all accounts')
+            LOG.error('Failed to get all accounts')
             raise exception.NotAuthorized()
         except Exception as e:
-            LOG.ERROR('Failed to get all accounts')
+            LOG.error('Failed to get all accounts')
             raise exception.DBError(reason=e)
 
-        accounts = [models.AdminAccount.from_db_model(account)
+        accounts = [models.AdminAccount.transform(**account)
                     for account in accounts]
 
-        return models.AdminAccounts(total_count=count,
-                                    accounts=accounts)
+        return models.AdminAccounts.transform(total_count=count,
+                                              accounts=accounts)
 
 

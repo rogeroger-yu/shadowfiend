@@ -56,6 +56,20 @@ class API(rpc_service.API):
         kwargs = dict(user_id=user_id)
         return self._call('get_account', **kwargs)
 
+    def get_accounts(self, context, owed=None, limit=None,
+                     offset=None, active_from=None):
+        kwargs = dict(owed=owed,
+                      limit=limit,
+                      offset=offset,
+                      active_from=active_from)
+        return self._call('get_accounts', **kwargs)
+
+    def get_accounts_count(self, context, owed=None,
+                           active_from=None):
+        kwargs = dict(owed=owed,
+                      active_from=active_from)
+        return self._call('get_accounts_count', **kwargs)
+
     def create_account(self, context, account):
         return self._call('create_account', **account)
 

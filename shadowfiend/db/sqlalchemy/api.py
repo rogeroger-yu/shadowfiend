@@ -1317,7 +1317,11 @@ class Connection(api.Connection):
                                 sort_key=sort_key, sort_dir=sort_dir,
                                 query=query)
 
-        return (self._row_to_db_account_model(r) for r in result)
+        accounts = []
+        for r in result:
+            self._transfer(r)
+            accounts.append(self._row_to_db_account_model(r).__dict__)
+        return accounts
 
     def get_accounts_count(self, context, read_deleted=False,
                            user_id=None, owed=None, active_from=None):

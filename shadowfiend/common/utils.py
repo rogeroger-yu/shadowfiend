@@ -41,3 +41,15 @@ def true_or_false(abool):
             return False
     raise ValueError("should be bool or true/false string")
 
+def normalize_timedelta(duration):
+    if not duration:
+        return
+    unit = duration[-1]
+    value = duration[:-1]
+    if unit == 'm':
+        return datetime.timedelta(minutes=float(value))
+    if unit == 'h':
+        return datetime.timedelta(hours=float(value))
+    if unit == 'd':
+        return datetime.timedelta(days=float(value))
+    raise ValueError("unsupport time unit")

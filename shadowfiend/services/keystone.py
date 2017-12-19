@@ -46,3 +46,6 @@ class KeystoneClient(BaseClient):
 
     def get_domain_list(name=None, enabled=None):
         return self.ks_client.domains.list(name=name, enabled=enabled)
+
+    def get_token():
+        return self.ks_client.auth_token

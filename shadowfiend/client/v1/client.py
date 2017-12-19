@@ -64,7 +64,7 @@ class Client(object):
                       offset=offset,
                       duration=duration)
         resp, body = self.client.get('/accounts', params=params)
-        return body['accounts']
+        return body
 
     def create_account(self, user_id, domain_id, balance,
                        consumption, level, **kwargs):
