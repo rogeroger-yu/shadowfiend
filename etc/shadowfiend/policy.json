@@ -5,6 +5,8 @@
     "context_is_domain_owner": "",
     "account_get": "rule:sf_admin or role:user",
     "account_delete": "rule:sf_admin or role:user",
+    "account:all": "rule:sf_admin or role:user",
     "account:level": "rule:sf_admin or role:user",
-    "account:charge": "rule:sf_admin or role:user"
+    "account:charge": "rule:sf_admin or role:user",
+    "charges:all": "rule:sf_admin or role:user"
 }

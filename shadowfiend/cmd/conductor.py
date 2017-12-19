@@ -28,6 +28,7 @@ from shadowfiend.conductor.handlers import account_api
 from shadowfiend.conductor.handlers import project_api
 from shadowfiend.conductor.handlers import usr_prj_api
 from shadowfiend.conductor.handlers import charge_api
+from shadowfiend.conductor.handlers import order_api
 
 
 LOG = log.getLogger(__name__)
@@ -44,6 +45,7 @@ def main():
         project_api.Handler(),
         usr_prj_api.Handler(),
         charge_api.Handler(),
+        order_api.Handler(),
     ]
 
     server = service.Service.create(binary='shadowfiend-conductor',

@@ -30,7 +30,7 @@ class V1Controller(rest.RestController):
     projects = project.ProjectController()
 #    relations = relation.RelationController()
 #    charges = charge.ChargeController()
-#    orders = order.OrderController()
+    orders = order.OrderController()
 
     @wsexpose(models.Version)
     def get(self):

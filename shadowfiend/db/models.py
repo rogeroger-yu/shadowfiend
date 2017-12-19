@@ -83,11 +83,11 @@ class Order(Model):
     """
     def __init__(self,
                  order_id, resource_id, resource_name, type, status,
-                 unit_price, unit, total_price, cron_time, date_time,
-                 user_id, project_id, region_id, domain_id, owed=None,
-                 renew=None, renew_method=None, renew_period=None,
-                 charged=None, created_at=None, updated_at=None,
-                 *args, **kwargs):
+                 unit_price, unit, user_id, project_id, region_id,
+                 total_price=None, cron_time=None, date_time=None,
+                 domain_id=None, owed=None, renew=None, renew_method=None,
+                 renew_period=None, charged=None, created_at=None,
+                 updated_at=None, *args, **kwargs):
         Model.__init__(
             self,
             order_id=order_id,

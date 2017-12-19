@@ -219,6 +219,12 @@ class Connection(api.Connection):
             model_type.balance if hasattr(model_type,'balance') else None)
         model_type.consumption = self._transfer_decimal2float(
             model_type.consumption if hasattr(model_type,'consumption') else None)
+        model_type.user_consumption = self._transfer_decimal2float(
+            model_type.user_consumption if hasattr(model_type,
+                                                   'user_consumption') else None)
+        model_type.project_consumption = self._transfer_decimal2float(
+            model_type.project_consumption if hasattr(model_type,
+                                                      'project_consumption') else None)
 
         model_type.charge_time = self._transfer_time2str(
             model_type.charge_time if hasattr(model_type,'charge_time') else None)
@@ -533,7 +539,7 @@ class Connection(api.Connection):
     @require_admin_context
     @oslo_db_api.wrap_db_retry(max_retries=5, retry_on_deadlock=True,
                                retry_on_request=True)
-    def create_order(self, context, **order):
+    def create_order(self, context, order):
         session = get_session()
         with session.begin():
             # get project
@@ -565,6 +571,7 @@ class Connection(api.Connection):
                     region_id=order['region_id'],
                 )
                 session.add(ref)
+                self._transfer(ref)
             else:
                 start_time = timeutils.utcnow()
                 months = utils.to_months(order['unit'], order['period'])
@@ -622,7 +629,7 @@ class Connection(api.Connection):
                 # Update project and user_project
                 try:
                     user_project = model_query(
-                        context, sa_models.UserProject, session=session).\
+                        context, sa_models.UsrPrjRelation, session=session).\
                         filter_by(project_id=order['project_id']).\
                         filter_by(user_id=project.user_id).\
                         one()
@@ -630,14 +637,14 @@ class Connection(api.Connection):
                     LOG.error('Could not find the relationship between '
                               'user(%s) and project(%s)',
                               project.user_id, order['project_id'])
-                    raise exception.UserProjectNotFound(
+                    raise exception.UsrPrjRelationNotFound(
                         user_id=project.user_id,
                         project_id=order['project_id'])
 
                 self._update_consumption(context, session, project,
                                          sa_models.Project, total_price)
                 self._update_consumption(context, session, user_project,
-                                         sa_models.UserProject, total_price,
+                                         sa_models.UsrPrjRelation, total_price,
                                          True)
 
                 # Update account
@@ -664,7 +671,7 @@ class Connection(api.Connection):
                                        account, filters, params,
                                        exception.AccountUpdateFailed())
 
-        return self._row_to_db_order_model(ref)
+        return self._row_to_db_order_model(ref).__dict__
 
     @require_admin_context
     @oslo_db_api.wrap_db_retry(max_retries=5, retry_on_deadlock=True,
@@ -1282,7 +1289,7 @@ class Connection(api.Connection):
                 session.delete(project)
 
             # delete the user_projects which were related to the account
-            user_projects = session.query(sa_models.UserProject).\
+            user_projects = session.query(sa_models.UsrPrjRelation).\
                 filter_by(user_id=user_id).all()
             for user_project in user_projects:
                 session.delete(user_project)
@@ -1615,21 +1622,19 @@ class Connection(api.Connection):
 
     def get_project(self, context, project_id):
         try:
-            project = get_session().query(sa_models.Project).\
+            project_ref = get_session().query(sa_models.Project).\
                 filter_by(project_id=project_id).one()
         except NoResultFound:
             raise exception.ProjectNotFound(project_id=project_id)
 
-        project.consumption = self._transfer_decimal2float(project.consumption)
-        project.created_at = self._transfer_time2str(project.created_at)
-        project.updated_at = self._transfer_time2str(project.updated_at)
-        return self._row_to_db_project_model(project).__dict__
+        _transfer(project_ref)
+        return self._row_to_db_project_model(project_ref).__dict__
 
     @require_context
     def get_user_projects(self, context, user_id=None,
                           limit=None, offset=None):
         # get user's all historical projects
-        query = model_query(context, sa_models.UserProject)
+        query = model_query(context, sa_models.UsrPrjRelation)
         if user_id:
             query = query.filter_by(user_id=user_id)
         user_projects = query.all()
@@ -1646,14 +1651,16 @@ class Connection(api.Connection):
             except NoResultFound:
                 p = None
 
-            up = db_models.UserProject(
+            up = db_models.UsrPrjRelation(
                 user_id=user_id,
                 project_id=u.project_id,
                 user_consumption=u.consumption,
                 project_consumption=p.consumption if p else u.consumption,
                 is_historical=False if p else True,
                 created_at=u.created_at)
-            result.append(up)
+
+            self._transfer(up)
+            result.append(up.__dict__)
 
         return result
 
@@ -1739,7 +1746,7 @@ class Connection(api.Connection):
                                                    sa_models.UsrPrjRelation,
                                                    session=session),
                                        user_project, filters, params,
-                                       exception.UserProjectUpdateFailed())
+                                       exception.UsrPrjRelationUpdateFailed())
             except NoResultFound:
                 session.add(sa_models.UsrPrjRelation(user_id=user_id,
                                                      project_id=project_id,
@@ -2349,7 +2356,7 @@ class Connection(api.Connection):
             # Update project and user_project
             try:
                 user_project = model_query(
-                    context, sa_models.UserProject, session=session).\
+                    context, sa_models.UsrPrjRelation, session=session).\
                     filter_by(project_id=order.project_id).\
                     filter_by(user_id=project.user_id).\
                     one()
@@ -2357,7 +2364,7 @@ class Connection(api.Connection):
                 LOG.error('Could not find the relationship between user(%s) '
                           'and project(%s)',
                           project.user_id, order.project_id)
-                raise exception.UserProjectNotFound(
+                raise exception.UsrPrjRelationNotFound(
                     user_id=project.user_id,
                     project_id=order.project_id)
             project.consumption += total_price

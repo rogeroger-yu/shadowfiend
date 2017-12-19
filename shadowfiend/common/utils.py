@@ -1,3 +1,4 @@
+import uuid
 from shadowfiend.common import constants as const
 
 
@@ -53,3 +54,15 @@ def normalize_timedelta(duration):
     if unit == 'd':
         return datetime.timedelta(days=float(value))
     raise ValueError("unsupport time unit")
+
+def is_uuid_like(val):
+    """Returns validation of a value as a UUID.
+
+    For our purposes, a UUID is a canonical form string:
+    aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa
+
+    """
+    try:
+        return str(uuid.UUID(val)) == val
+    except (TypeError, ValueError, AttributeError):
+        return False

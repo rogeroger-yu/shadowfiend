@@ -51,6 +51,13 @@ class Client(object):
         resp, body = self.client.get('/projects/%s' % project_id)
         return body
 
+    def get_projects(self, user_id=None, type=None, duration=None):
+        _body = dict(user_id=user_id,
+                      type=type,
+                      duration=duration)
+        resp, body = self.client.get('/projects', body=_body)
+        return body
+
     def get_order_by_resource_id():
         pass
 
@@ -59,11 +66,11 @@ class Client(object):
         return body
 
     def get_accounts(self, owed=None, limit=None, offset=None, duration=None):
-        params = dict(owed=owed,
+        _body = dict(owed=owed,
                       limit=limit,
                       offset=offset,
                       duration=duration)
-        resp, body = self.client.get('/accounts', params=params)
+        resp, body = self.client.get('/accounts', body=_body)
         return body
 
     def create_account(self, user_id, domain_id, balance,
@@ -93,3 +100,88 @@ class Client(object):
         if body:
             return body['charges']
         return []
+
+    def get_order(self, order_id):
+        resp, body = self.client.get('/orders/%s/order' % order_id)
+        return body
+
+    def get_order_by_resource_id(self, resource_id):
+        params = dict(resource_id=resource_id)
+        resp, body = self.client.get('/orders/resource',
+                                     params=params)
+        return body
+
+    def get_orders(self, status=None, project_id=None, owed=None,
+                   region_id=None, type=None, bill_methods=None):
+        params = dict(status=status,
+                      type=type,
+                      project_id=project_id,
+                      owed=owed,
+                      region_id=region_id,
+                      bill_methods=bill_methods)
+        resp, body = self.client.get('/orders', params=params)
+        if body:
+            return body['orders']
+        return []
+
+    def create_order(self, order_id, region_id, unit_price,
+                     unit, **kwargs):
+        _body = dict(order_id=order_id,
+                     region_id=region_id,
+                     unit_price=unit_price,
+                     unit=unit,
+                     **kwargs)
+        self.client.post('/orders', body=_body)
+
+    def change_order(self, order_id, change_to, cron_time=None,
+                     change_order_status=True, first_change_to=None):
+        _body = dict(order_id=order_id,
+                     change_to=change_to,
+                     cron_time=cron_time,
+                     change_order_status=change_order_status,
+                     first_change_to=first_change_to)
+        self.client.put('/orders', body=_body)
+
+    def close_order(self, order_id):
+        self.client.put('/orders/%s/close' % order_id)
+
+    def delete_resource_order(self, order_id, resource_type):
+        _body = dict(resource_type=resource_type)
+        resp, body = self.client.post('/orders/%s/delete_resource' % order_id,
+                                      body=_body)
+        if body:
+            return body
+        return {}
+
+    def get_active_orders(self, user_id=None, project_id=None, owed=None,
+                          charged=None, region_id=None, bill_methods=None):
+        params = dict(user_id=user_id,
+                      project_id=project_id,
+                      owed=owed,
+                      charged=charged,
+                      region_id=region_id,
+                      bill_methods=bill_methods)
+        resp, body = self.client.get('/orders/active', params=params)
+        if body:
+            return body
+        return []
+
+    def get_active_order_count(self, region_id=None, owed=None, type=None,
+                               bill_methods=None):
+        params = dict(region_id=region_id,
+                      owed=owed,
+                      type=type,
+                      bill_methods=bill_methods)
+        resp, body = self.client.get('/orders/count',
+                                     params=params)
+        return body
+
+    def get_stopped_order_count(self, region_id=None, owed=None, type=None,
+                                bill_methods=None):
+        params = dict(region_id=region_id,
+                      owed=owed,
+                      type=type,
+                      bill_methods=bill_methods)
+        resp, body = self.client.get('/orders/stopped',
+                                     params=params)
+        return body

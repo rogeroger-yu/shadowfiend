@@ -49,3 +49,11 @@ class KeystoneClient(BaseClient):
 
     def get_token():
         return self.ks_client.auth_token
+
+def get_domain_list(name=None, enabled=None):
+    ks = KeystoneClient()
+    return ks.ks_client.domains.list(name=name, enabled=enabled)
+
+def get_project_list(domain=None, name=None, user=None):
+    ks = KeystoneClient()
+    return ks.ks_client.projects.list(domain=domain, name=name, user=user)

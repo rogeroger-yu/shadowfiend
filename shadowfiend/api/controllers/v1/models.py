@@ -156,3 +156,57 @@ class BalanceFrozenResult(APIBase):
 
 class BalanceFrozenBody(APIBase):
     total_price = wsme.wsattr(float, mandatory=True)
+
+
+class OrderPostBody(APIBase):
+    """One single order."""
+    order_id = wtypes.text
+    unit_price = float
+    unit = wtypes.text
+    period = int
+    renew = bool
+    resource_id = wtypes.text
+    resource_name = wtypes.text
+    user_id = wtypes.text
+    project_id = wtypes.text
+    region_id = wtypes.text
+    type = wtypes.text
+    status = wtypes.text
+
+
+class OrderPutBody(APIBase):
+    order_id = wtypes.text
+    change_to = wtypes.text
+    cron_time = datetime.datetime
+    change_order_status = bool
+    first_change_to = wtypes.text
+
+
+class Order(APIBase):
+    """One single order."""
+    order_id = wtypes.text
+    resource_id = wtypes.text
+    resource_name = wtypes.text
+    status = wtypes.text
+    unit_price = float
+    unit = wtypes.text
+    total_price = float
+    type = wtypes.text
+    cron_time = wtypes.text
+    date_time = wtypes.text
+    created_at = wtypes.text
+    updated_at = wtypes.text
+    user_id = wtypes.text
+    project_id = wtypes.text
+    domain_id = wtypes.text
+    region_id = wtypes.text
+    owed = bool
+    renew = bool
+    renew_method = wtypes.text
+    renew_period = int
+
+class Orders(APIBase):
+    """Collection of orders."""
+    total_count = int
+    orders = [Order]
+

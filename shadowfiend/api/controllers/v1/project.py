@@ -13,7 +13,7 @@ from shadowfiend.common import exception
 from shadowfiend.api import acl
 from shadowfiend.api.controllers.v1 import models
 from shadowfiend.db import models as db_models
-from shadowfiend.services.keystone import KeystoneClient as ks_client
+from shadowfiend.services import keystone as ks_client
 
 
 LOG = log.getLogger(__name__)
@@ -104,8 +104,9 @@ class ProjectController(rest.RestController):
     @wsexpose([models.UserProject], wtypes.text, wtypes.text, wtypes.text)
     def get_all(self, user_id=None, type=None, duration=None):
         """Get all projects."""
-        user_id = acl.get_limited_to_user(HOOK.headers,
-                                          'projects_get') or user_id
+        #user_id = acl.get_limited_to_user(HOOK.headers,
+        #                                  'projects_get') or user_id
+        user_id = user_id
         result = []
 
         if not type or type.lower() == 'pay':
@@ -120,26 +121,27 @@ class ProjectController(rest.RestController):
                 LOG.exception('Fail to get all projects')
                 raise exception.DBError(reason=e)
 
-            project_ids = [up.project_id for up in user_projects]
-
-            if not project_ids:
+            if not user_projects:
                 LOG.warn('User %s has no payed projects' % user_id)
                 return []
+
+            project_ids = [up['project_id'] for up in user_projects]
+
 
             projects = self._list_keystone_projects()
 
             for u, p in itertools.product(user_projects, projects):
-                if u.project_id == p.id:
+                if u['project_id'] == p.id:
                     up = models.UserProject(user_id=user_id,
-                                            project_id=u.project_id,
+                                            project_id=u['project_id'],
                                             project_name=p.name,
-                                            user_consumption=u.user_consumption,
-                                            project_consumption=u.project_consumption,
+                                            user_consumption=u['user_consumption'],
+                                            project_consumption=u['project_consumption'],
                                             billing_owner=None,
                                             project_owner=None,
                                             project_creator=None,
-                                            is_historical=u.is_historical,
-                                            created_at=u.created_at)
+                                            is_historical=u['is_historical'],
+                                            created_at=u['created_at'])
                     result.append(up)
         elif type.lower() == 'all':
             # if admin call this api, limit to admin's user_id

@@ -52,6 +52,14 @@ class API(rpc_service.API):
         kwargs = dict(project_id=project_id)
         return self._call('delete_project', **kwargs)
 
+    def get_user_projects(self, context, user_id):
+        kwargs = dict(user_id=user_id)
+        return self._call('get_user_projects', **kwargs)
+
+    def get_projects_by_project_ids(self, context, project_ids):
+        kwargs = dict(project_ids=project_ids)
+        return self._call('get_projects_by_project_ids', **kwargs)
+
     def get_account(self, context, user_id):
         kwargs = dict(user_id=user_id)
         return self._call('get_account', **kwargs)
@@ -108,3 +116,6 @@ class API(rpc_service.API):
                       start_time=start_time,
                       end_time=end_time)
         return self._call('get_charges_price_and_count', **kwargs)
+
+    def create_order(self, context, order):
+        return self._call('create_order', **order)
