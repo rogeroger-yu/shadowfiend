@@ -102,7 +102,7 @@ class Client(object):
         return []
 
     def get_order(self, order_id):
-        resp, body = self.client.get('/orders/%s/order' % order_id)
+        resp, body = self.client.get('/orders/%s' % order_id)
         return body
 
     def get_order_by_resource_id(self, resource_id):

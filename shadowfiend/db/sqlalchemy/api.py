@@ -786,7 +786,8 @@ class Connection(api.Connection):
             LOG.warning('The order %s not found' % order_id)
             raise exception.OrderNotFound(order_id=order_id)
 
-        return self._row_to_db_order_model(ref)
+        self._transfer(ref)
+        return self._row_to_db_order_model(ref).__dict__
 
     @require_context
     def get_orders(self, context, start_time=None, end_time=None, type=None,

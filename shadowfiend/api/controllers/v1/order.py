@@ -25,7 +25,6 @@ class ExistOrderController(rest.RestController):
     """For one single order, getting its detail consumptions."""
 
     _custom_actions = {
-        'order': ['GET'],
         'close': ['PUT'],
         'activate_auto_renew': ['PUT'],
         'switch_auto_renew': ['PUT'],
@@ -56,33 +55,10 @@ class ExistOrderController(rest.RestController):
             raise exception.OrderBillsNotFound(order_id=self._id)
         return bills
 
-    @wsexpose(None, datetime.datetime, datetime.datetime, int, int)
-    def get(self, start_time=None, end_time=None, limit=None, offset=None):
-        """Get this order's detail."""
-
-        if limit and limit < 0:
-            raise exception.InvalidParameterValue(err="Invalid limit")
-        if offset and offset < 0:
-            raise exception.InvalidParameterValue(err="Invalid offset")
-
-        bills = self._order(start_time=start_time, end_time=end_time,
-                            limit=limit, offset=offset)
-        bills_list = []
-        for bill in bills:
-            bills_list.append(models.Bill.from_db_model(bill))
-
-        total_count = self.conn.get_bills_count(HOOK.context,
-                                                order_id=self._id,
-                                                start_time=start_time,
-                                                end_time=end_time)
-
-        return None.transform(total_count=total_count,
-                                      bills=bills_list)
-
     @wsexpose(models.Order)
-    def order(self):
-        conn = pecan.request.db_conn
-        order = conn.get_order(HOOK.context, self._id)
+    def get(self):
+        """Get this order's detail."""
+        order = HOOK.conductor_rpcapi.get_order(HOOK.context, self._id)
         return models.Order.from_db_model(order)
 
     def _validate_resize(self, resize):

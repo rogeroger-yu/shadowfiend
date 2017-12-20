@@ -20,3 +20,7 @@ class Handler(object):
     def close_order(cls, context, **kwargs):
         LOG.debug('close order: Received message from RPC.')
         return cls.dbapi.close_order(context, kwargs['order_id'])
+
+    def get_order(cls, context, **kwargs):
+        LOG.debug('get order: Received message from RPC.')
+        return cls.dbapi.get_order(context, kwargs['order_id'])
