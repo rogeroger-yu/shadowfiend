@@ -1,4 +1,5 @@
 import uuid
+from decimal import Decimal, ROUND_HALF_UP
 from shadowfiend.common import constants as const
 
 
@@ -18,6 +19,12 @@ STATE_MAPPING = {
     'true': const.STATE_RUNNING,
     'false': const.STATE_STOPPED,
 }
+
+
+def _quantize_decimal(value):
+    if isinstance(value, Decimal):
+        return value.quantize(Decimal('0.0001'), rounding=ROUND_HALF_UP)
+    return Decimal(str(value)).quantize(Decimal('0.0001'), rounding=ROUND_HALF_UP)
 
 
 def transform_status(status):

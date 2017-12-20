@@ -119,3 +119,7 @@ class API(rpc_service.API):
 
     def create_order(self, context, order):
         return self._call('create_order', **order)
+
+    def close_order(self, context, order_id):
+        kwargs = dict(order_id=order_id)
+        return self._call('close_order', **kwargs)

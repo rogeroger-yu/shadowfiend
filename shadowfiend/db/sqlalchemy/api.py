@@ -33,6 +33,7 @@ from sqlalchemy.orm.exc import MultipleResultsFound
 from sqlalchemy.orm.exc import NoResultFound
 
 from shadowfiend.common import context as shadow_context
+from shadowfiend.common import constants as const
 from shadowfiend.common import exception
 from shadowfiend.common import utils
 from shadowfiend.db import api
@@ -46,6 +47,7 @@ CONF = cfg.CONF
 
 _FACADE = None
 
+quantize = utils._quantize_decimal
 
 def require_admin_context(f):
     """Decorator to require admin request context.
@@ -225,6 +227,11 @@ class Connection(api.Connection):
         model_type.project_consumption = self._transfer_decimal2float(
             model_type.project_consumption if hasattr(model_type,
                                                       'project_consumption') else None)
+        model_type.unit_price = self._transfer_decimal2float(
+            model_type.unit_price if hasattr(model_type,'unit_price') else None)
+        model_type.total_price = self._transfer_decimal2float(
+            model_type.total_price if hasattr(model_type,'total_price') else None)
+
 
         model_type.charge_time = self._transfer_time2str(
             model_type.charge_time if hasattr(model_type,'charge_time') else None)
@@ -234,6 +241,10 @@ class Connection(api.Connection):
             model_type.updated_at if hasattr(model_type,'updated_at') else None)
         model_type.deleted_at = self._transfer_time2str(
             model_type.deleted_at if hasattr(model_type,'deleted_at') else None)
+        model_type.cron_time = self._transfer_time2str(
+            model_type.cron_time if hasattr(model_type,'cron_time') else None)
+        model_type.date_time = self._transfer_time2str(
+            model_type.date_time if hasattr(model_type,'date_time') else None)
 
 
     @staticmethod
@@ -749,8 +760,9 @@ class Connection(api.Connection):
                                                sa_models.Order,
                                                session=session),
                                    order, filters, params,
-                                   exception.OrderUpdateFiled())
-        return self._row_to_db_order_model(order)
+                                   exception.OrderUpdateFailed())
+        self._transfer(order)
+        return self._row_to_db_order_model(order).__dict__
 
     @require_context
     def get_order_by_resource_id(self, context, resource_id):

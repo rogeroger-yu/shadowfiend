@@ -39,7 +39,6 @@ class ExistOrderController(rest.RestController):
 
     def __init__(self, order_id):
         self._id = order_id
-        self.master_api = master.API()
 
     def _order(self, start_time=None, end_time=None,
                limit=None, offset=None):
@@ -114,14 +113,12 @@ class ExistOrderController(rest.RestController):
         Close means set order's status to deleted in database, then stop
         the cron job in apscheduler.
         """
-        conn = pecan.request.db_conn
         try:
-            order = conn.close_order(HOOK.context, self._id)
+            order = HOOK.conductor_rpcapi.close_order(HOOK.context, self._id)
         except Exception:
             msg = "Fail to close the order %s" % self._id
             LOG.exception(msg)
             raise exception.DBError(reason=msg)
-        self.master_api.delete_sched_jobs(HOOK.context, self._id)
         return models.Order.from_db_model(order)
 
     def _validate_renew(self, renew):

@@ -16,3 +16,7 @@ class Handler(object):
         LOG.debug('create order: Received message from RPC.')
         order = db_models.Order(**kwargs)
         return cls.dbapi.create_order(context, order)
+
+    def close_order(cls, context, **kwargs):
+        LOG.debug('close order: Received message from RPC.')
+        return cls.dbapi.close_order(context, kwargs['order_id'])
