@@ -31,12 +31,12 @@ class Client(object):
 
     def __init__(self, auth_plugin="token",
                  verify=True, cert=None, timeout=None, *args, **kwargs):
-        self.auth_plugin = driver.DriverManager(('shadowfiend.'
-                                                 'client_auth_plugin'),
-                                                auth_plugin,
-                                                invoke_on_load=True,
-                                                invoke_args=args,
-                                                invoke_kwds=kwargs)
+        self.auth_plugin = driver.DriverManager(
+            'shadowfiend.client_auth_plugin',
+            auth_plugin,
+            invoke_on_load=True,
+            invoke_args=args,
+            invoke_kwds=kwargs)
 
         self.auth_plugin = self.auth_plugin.driver
         self.session = requests.Session()

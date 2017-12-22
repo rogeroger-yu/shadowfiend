@@ -9,9 +9,10 @@ from wsme import types as wtypes
 from oslo_config import cfg
 from oslo_log import log
 
-from shadowfiend.common import exception
 from shadowfiend.api import acl
 from shadowfiend.api.controllers.v1 import models
+from shadowfiend.common import exception
+from shadowfiend.common import timeutils
 from shadowfiend.db import models as db_models
 from shadowfiend.services import keystone as ks_client
 
@@ -104,9 +105,8 @@ class ProjectController(rest.RestController):
     @wsexpose([models.UserProject], wtypes.text, wtypes.text, wtypes.text)
     def get_all(self, user_id=None, type=None, duration=None):
         """Get all projects."""
-        #user_id = acl.get_limited_to_user(HOOK.headers,
-        #                                  'projects_get') or user_id
-        user_id = user_id
+        user_id = acl.get_limited_to_user(HOOK.headers,
+                                          'projects_get') or user_id
         result = []
 
         if not type or type.lower() == 'pay':
@@ -115,8 +115,9 @@ class ProjectController(rest.RestController):
                 user_id = HOOK.context.user_id
 
             try:
-                user_projects = HOOK.conductor_rpcapi.get_user_projects(HOOK.context,
-                                                                        user_id=user_id)
+                user_projects = HOOK.conductor_rpcapi.get_user_projects(
+                    HOOK.context,
+                    user_id=user_id)
             except Exception as e:
                 LOG.exception('Fail to get all projects')
                 raise exception.DBError(reason=e)
@@ -127,21 +128,21 @@ class ProjectController(rest.RestController):
 
             project_ids = [up['project_id'] for up in user_projects]
 
-
             projects = self._list_keystone_projects()
 
             for u, p in itertools.product(user_projects, projects):
                 if u['project_id'] == p.id:
-                    up = models.UserProject(user_id=user_id,
-                                            project_id=u['project_id'],
-                                            project_name=p.name,
-                                            user_consumption=u['user_consumption'],
-                                            project_consumption=u['project_consumption'],
-                                            billing_owner=None,
-                                            project_owner=None,
-                                            project_creator=None,
-                                            is_historical=u['is_historical'],
-                                            created_at=u['created_at'])
+                    up = models.UserProject(
+                        user_id=user_id,
+                        project_id=u['project_id'],
+                        project_name=p.name,
+                        user_consumption=u['user_consumption'],
+                        project_consumption=u['project_consumption'],
+                        billing_owner=None,
+                        project_owner=None,
+                        project_creator=None,
+                        is_historical=u['is_historical'],
+                        created_at=u['created_at'])
                     result.append(up)
         elif type.lower() == 'all':
             # if admin call this api, limit to admin's user_id
@@ -149,35 +150,34 @@ class ProjectController(rest.RestController):
                 user_id = HOOK.context.user_id
 
             k_projects = ks_client.get_project_list(name=user_id)
-            project_ids = [p['id'] for p in k_projects]
+            LOG.debug('Projects: %s' % k_projects)
+            project_ids = [p.id for p in k_projects]
 
             if not project_ids:
-                LOG.warn('User %s has no projects' % user_id)
+                LOG.warning('User %s has no projects' % user_id)
                 return []
 
             try:
-                sf_projects = HOOK.conductor_rpcapi.get_projects_by_project_ids(HOOK.context,
-                                                                               project_ids)
+                sf_projects = (HOOK.conductor_rpcapi.
+                               get_projects_by_project_ids(
+                                   HOOK.context, project_ids))
             except Exception as e:
                 LOG.exception('Fail to get all projects')
                 raise exception.DBError(reason=e)
             for k, sf in itertools.product(k_projects, sf_projects):
-                if k['id'] == sf.project_id:
-                    billing_owner = k['users']['billing_owner']
-                    project_owner = k['users']['project_owner']
-                    project_creator = k['users']['project_creator']
-                    up = models.UserProject(user_id=user_id,
-                                            project_id=sf.project_id,
-                                            project_name=k['name'],
-                                            project_consumption=sf.consumption,
-                                            billing_owner=dict(user_id=billing_owner.get('id') if billing_owner else None,
-                                                               user_name=billing_owner.get('name') if billing_owner else None),
-                                            project_owner=dict(user_id=project_owner.get('id') if project_owner else None,
-                                                               user_name=project_owner.get('name') if project_owner else None),
-                                            project_creator=dict(user_id=project_creator.get('id') if project_creator else None,
-                                                                 user_name=project_creator.get('name') if project_creator else None),
-                                            is_historical=False,
-                                            created_at=timeutils.parse_isotime(k['created_at']) if k['created_at'] else None)
+                k = k.__dict__
+                if k['id'] == sf['project_id']:
+                    up = models.UserProject(
+                        user_id=user_id,
+                        project_id=sf['project_id'],
+                        project_name=k['name'],
+                        project_consumption=sf['consumption'],
+                        billing_owner=None,
+                        project_owner=None,
+                        project_creator=None,
+                        is_historical=False,
+                        created_at=(
+                            sf['created_at'] if sf['created_at'] else None))
                     result.append(up)
 
         elif type.lower() == 'simple':
@@ -186,9 +186,10 @@ class ProjectController(rest.RestController):
                 active_from = datetime.datetime.utcnow() - duration
             else:
                 active_from = None
-            sf_projects = list(HOOK.conductor_rpcapi.get_projects(HOOK.context,
-                                                                 user_id=user_id,
-                                                                 active_from=active_from))
+            sf_projects = list(HOOK.conductor_rpcapi.get_projects(
+                HOOK.context,
+                user_id=user_id,
+                active_from=active_from))
             project_ids = [p.project_id for p in sf_projects]
 
             if not project_ids:
@@ -198,11 +199,12 @@ class ProjectController(rest.RestController):
             k_projects = self._list_keystone_projects()
 
             for k, sf in itertools.product(k_projects, sf_projects):
-                if k.id == sf.project_id:
-                    up = models.UserProject(project_id=sf.project_id,
-                                            project_name=k.name,
-                                            domain_id=sf.domain_id,
-                                            billing_owner=dict(user_id=sf.user_id))
+                if k.id == sf['project_id']:
+                    up = models.UserProject(
+                        project_id=sf['project_id'],
+                        project_name=k.name,
+                        domain_id=sf['domain_id'],
+                        billing_owner=dict(user_id=sf['user_id']))
                     result.append(up)
 
         return result

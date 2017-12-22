@@ -128,3 +128,15 @@ class API(rpc_service.API):
         kwargs = dict(order_id=order_id)
         return self._call('get_order', **kwargs)
 
+    def get_order_by_resource_id(self, context, resource_id):
+        kwargs = dict(resource_id=resource_id)
+        return self._call('get_order_by_resource_id', **kwargs)
+
+    def update_order(self, context, order_id, change_to,
+                     cron_time, change_order_status, first_change_to):
+        kwargs = dict(order_id=order_id,
+                      change_to=change_to,
+                      cron_time=cron_time,
+                      change_order_status=change_order_status,
+                      first_change_to=first_change_to)
+        return self._call('update_order', **kwargs)

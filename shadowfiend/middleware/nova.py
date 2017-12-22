@@ -108,9 +108,9 @@ class NovaBillingProtocol(base.BillingProtocol):
     def __init__(self, app, conf):
         super(NovaBillingProtocol, self).__init__(app, conf)
         self.resource_regex = re.compile(
-            r"^/%s/%s/%s([.][^.]+)?$" % (UUID_RE, RESOURCE_RE, UUID_RE), re.UNICODE)
+            r"^/%s/%s([.][^.]+)?$" % (RESOURCE_RE, UUID_RE), re.UNICODE)
         self.create_resource_regex = re.compile(
-            r"^/%s/%s([.][^.]+)?$" % (UUID_RE, RESOURCE_RE), re.UNICODE)
+            r"^/%s([.][^.]+)?$" % (RESOURCE_RE), re.UNICODE)
 
         self.server_action_regex = re.compile(
             r"^/%s/(servers)/%s/action([.][^.]+)?$" % (UUID_RE, UUID_RE))
@@ -118,7 +118,7 @@ class NovaBillingProtocol(base.BillingProtocol):
             r"^/%s/(servers)/%s/os-volume_attachments([.][^.]+)?$" % \
             (UUID_RE, UUID_RE))
 
-        self.position = 2
+        self.position = 1
         self.black_list += [
             self.other_server_actions,
             self.resize_server_action,

@@ -177,7 +177,7 @@ class OrderPostBody(APIBase):
 class OrderPutBody(APIBase):
     order_id = wtypes.text
     change_to = wtypes.text
-    cron_time = datetime.datetime
+    cron_time = wtypes.text
     change_order_status = bool
     first_change_to = wtypes.text
 

@@ -1,5 +1,5 @@
 {
-    "sf_admin": "role:sf_admin or role:admin",
+    "sf_admin": "role:admin",
     "account:post": "rule:sf_admin or role:user",
     "context_is_admin": "",
     "context_is_domain_owner": "",
@@ -8,5 +8,6 @@
     "account:all": "rule:sf_admin or role:user",
     "account:level": "rule:sf_admin or role:user",
     "account:charge": "rule:sf_admin or role:user",
-    "charges:all": "rule:sf_admin or role:user"
+    "charges:all": "rule:sf_admin or role:user",
+    "projects_get": "rule:sf_admin"
 }

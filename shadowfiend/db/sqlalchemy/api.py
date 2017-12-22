@@ -24,7 +24,8 @@ from oslo_db import api as oslo_db_api
 from oslo_db import exception as db_exc
 from oslo_db.sqlalchemy import session as db_session
 from oslo_db.sqlalchemy import utils as db_utils
-from sqlalchemy import desc,asc
+from sqlalchemy import desc
+from sqlalchemy import asc
 from sqlalchemy import func
 from sqlalchemy import not_
 from oslo_utils import timeutils
@@ -49,11 +50,11 @@ _FACADE = None
 
 quantize = utils._quantize_decimal
 
+
 def require_admin_context(f):
     """Decorator to require admin request context.
 
     The second argument to the wrapped function must be the context.
-
     """
 
     @functools.wraps(f)
@@ -71,7 +72,6 @@ def require_context(f):
     :py:func:`nova.context.authorize_user_context`.
 
     The second argument to the wrapped function must be the context.
-
     """
 
     @functools.wraps(f)
@@ -79,7 +79,6 @@ def require_context(f):
         shadow_context.require_context(args[1])
         return f(*args, **kwargs)
     return wrapper
-
 
 
 def _create_facade_lazily():
@@ -216,36 +215,43 @@ class Connection(api.Connection):
 
     def _transfer(self, model_type):
         model_type.value = self._transfer_decimal2float(
-            model_type.value if hasattr(model_type,'value') else None)
+            model_type.value if hasattr(model_type, 'value') else None)
         model_type.balance = self._transfer_decimal2float(
-            model_type.balance if hasattr(model_type,'balance') else None)
+            model_type.balance if hasattr(model_type, 'balance') else None)
         model_type.consumption = self._transfer_decimal2float(
-            model_type.consumption if hasattr(model_type,'consumption') else None)
+            model_type.consumption if hasattr(model_type, 'consumption')
+            else None)
         model_type.user_consumption = self._transfer_decimal2float(
-            model_type.user_consumption if hasattr(model_type,
-                                                   'user_consumption') else None)
+            model_type.user_consumption
+            if hasattr(model_type, 'user_consumption') else None)
         model_type.project_consumption = self._transfer_decimal2float(
-            model_type.project_consumption if hasattr(model_type,
-                                                      'project_consumption') else None)
+            model_type.project_consumption
+            if hasattr(model_type, 'project_consumption') else None)
         model_type.unit_price = self._transfer_decimal2float(
-            model_type.unit_price if hasattr(model_type,'unit_price') else None)
+            model_type.unit_price if hasattr(model_type, 'unit_price')
+            else None)
         model_type.total_price = self._transfer_decimal2float(
-            model_type.total_price if hasattr(model_type,'total_price') else None)
-
+            model_type.total_price if hasattr(model_type, 'total_price')
+            else None)
 
         model_type.charge_time = self._transfer_time2str(
-            model_type.charge_time if hasattr(model_type,'charge_time') else None)
+            model_type.charge_time if hasattr(model_type, 'charge_time')
+            else None)
         model_type.created_at = self._transfer_time2str(
-            model_type.created_at if hasattr(model_type,'created_at') else None)
+            model_type.created_at if hasattr(model_type, 'created_at')
+            else None)
         model_type.updated_at = self._transfer_time2str(
-            model_type.updated_at if hasattr(model_type,'updated_at') else None)
+            model_type.updated_at if hasattr(model_type, 'updated_at')
+            else None)
         model_type.deleted_at = self._transfer_time2str(
-            model_type.deleted_at if hasattr(model_type,'deleted_at') else None)
+            model_type.deleted_at if hasattr(model_type, 'deleted_at')
+            else None)
         model_type.cron_time = self._transfer_time2str(
-            model_type.cron_time if hasattr(model_type,'cron_time') else None)
+            model_type.cron_time if hasattr(model_type, 'cron_time')
+            else None)
         model_type.date_time = self._transfer_time2str(
-            model_type.date_time if hasattr(model_type,'date_time') else None)
-
+            model_type.date_time if hasattr(model_type, 'date_time')
+            else None)
 
     @staticmethod
     def _row_to_db_product_model(row):
@@ -463,7 +469,8 @@ class Connection(api.Connection):
         with session.begin():
             query = model_query(context, sa_models.Product)
             query = query.filter_by(product_id=product.product_id)
-            query.update(self._product_object_to_dict(product), synchronize_session='fetch')
+            query.update(self._product_object_to_dict(product),
+                         synchronize_session='fetch')
             ref = query.one()
         return self._row_to_db_product_model(ref)
 
@@ -536,7 +543,7 @@ class Connection(api.Connection):
                             user_id=False):
         consumption = obj.consumption + total_price
         params = dict(consumption=consumption,
-                      updated_at = datetime.datetime.utcnow())
+                      updated_at=datetime.datetime.utcnow())
         filters = params.keys()
         filters.append('project_id')
         if user_id:
@@ -692,32 +699,14 @@ class Connection(api.Connection):
         """
         session = get_session()
         with session.begin():
-            # Get subs of this order
-            subs = model_query(
-                context, sa_models.Subscription, session=session).\
-                filter_by(order_id=kwargs['order_id']).\
-                filter_by(type=kwargs['change_to']).\
-                with_lockmode('read').all()
-
             # caculate new unit price
             unit_price = 0
 
-            for sub in subs:
-                price_data = None
-                if sub.unit_price:
-                    try:
-                        unit_price_data = jsonutils.loads(sub.unit_price)
-                        price_data = unit_price_data.get('price', None)
-                    except (Exception):
-                        pass
-
-                unit_price += pricing.calculate_price(
-                    sub.quantity, price_data)
-
             # update the order
-            order = model_query(context, sa_models.Order, session=session).\
-                filter_by(order_id=kwargs['order_id']).\
-                one()
+            order = model_query(
+                context,
+                sa_models.Order,
+                session=session).filter_by(order_id=kwargs['order_id']).one()
 
             params = dict(unit_price=unit_price,
                           updated_at=datetime.datetime.utcnow())
@@ -730,11 +719,14 @@ class Connection(api.Connection):
 
             filters = params.keys()
             filters.append('order_id')
-            self._compare_and_swap(model_query(context,
-                                               sa_models.Order,
-                                               session=session),
-                                   order, filters, params,
-                                   exception.OrderUpdateFailed())
+            self._compare_and_swap(
+                model_query(context,
+                            sa_models.Order,
+                            session=session),
+                order,
+                filters,
+                params,
+                exception.OrderUpdateFailed())
 
     @require_admin_context
     @oslo_db_api.wrap_db_retry(max_retries=5, retry_on_deadlock=True,
@@ -774,7 +766,8 @@ class Connection(api.Connection):
             LOG.warning('The order of the resource(%s) not found', resource_id)
             raise exception.ResourceOrderNotFound(resource_id=resource_id)
 
-        return self._row_to_db_order_model(ref)
+        self._transfer(ref)
+        return self._row_to_db_order_model(ref).__dict__
 
     @require_context
     def get_order(self, context, order_id):
@@ -1345,8 +1338,9 @@ class Connection(api.Connection):
 
     def get_accounts_count(self, context, read_deleted=False,
                            user_id=None, owed=None, active_from=None):
-        query = get_session().query(sa_models.Account,
-                                    func.count(sa_models.Account.id).label('count'))
+        query = get_session().query(
+            sa_models.Account,
+            func.count(sa_models.Account.id).label('count'))
         if owed is not None:
             query = query.filter_by(owed=owed)
         if user_id:
@@ -1363,9 +1357,8 @@ class Connection(api.Connection):
     def change_account_level(self, context, user_id, level, project_id=None):
         session = get_session()
         with session.begin():
-            account_ref = session.query(sa_models.Account).\
-                    filter_by(user_id=user_id).\
-                    one()
+            account_ref = (session.query(sa_models.Account).
+                           filter_by(user_id=user_id).one())
             params = {'level': level}
             filters = params.keys()
             filters.append('user_id')
@@ -1402,16 +1395,16 @@ class Connection(api.Connection):
                 charge_time = timeutils.parse_isotime(data['charge_time'])
 
             charge_ref = sa_models.Charge(charge_id=uuidutils.generate_uuid(),
-                                      user_id=account.user_id,
-                                      domain_id=account.domain_id,
-                                      value=data['value'],
-                                      type=data.get('type'),
-                                      come_from=data.get('come_from'),
-                                      trading_number=data.get(
-                                          'trading_number'),
-                                      charge_time=charge_time,
-                                      operator=operator,
-                                      remarks=data.get('remarks'))
+                                          user_id=account.user_id,
+                                          domain_id=account.domain_id,
+                                          value=data['value'],
+                                          type=data.get('type'),
+                                          come_from=data.get('come_from'),
+                                          trading_number=data.get(
+                                              'trading_number'),
+                                          charge_time=charge_time,
+                                          operator=operator,
+                                          remarks=data.get('remarks'))
             session.add(charge_ref)
 
         self._transfer(charge_ref)
@@ -1548,7 +1541,8 @@ class Connection(api.Connection):
             query = query.filter(sa_models.Charge.charge_time >= start_time,
                                  sa_models.Charge.charge_time < end_time)
 
-        return self._transfer_decimal2float(query.one().sum) or 0, query.one().count or 0
+        return (self._transfer_decimal2float(query.one().sum) or 0,
+                query.one().count or 0)
 
     def create_project(self, context, project):
         session = get_session()
@@ -1557,7 +1551,8 @@ class Connection(api.Connection):
             user_project_ref = sa_models.UsrPrjRelation(**project.as_dict())
             session.add(project_ref)
             session.add(user_project_ref)
-        project_ref.created_at = self._transfer_time2str(project_ref.created_at)
+        project_ref.created_at = self._transfer_time2str(
+            project_ref.created_at)
         return self._row_to_db_project_model(project_ref).__dict__
 
     @require_context
@@ -1679,10 +1674,15 @@ class Connection(api.Connection):
 
     @require_context
     def get_projects_by_project_ids(self, context, project_ids):
-        projects = get_session().query(sa_models.Project).\
+        result = get_session().query(sa_models.Project).\
             filter(sa_models.Project.project_id.in_(project_ids)).\
             all()
-        return (self._row_to_db_project_model(p) for p in projects)
+
+        projects = []
+        for r in result:
+            self._transfer(r)
+            projects.append(self._row_to_db_project_model(r).__dict__)
+        return projects
 
     @require_context
     def get_projects(self, context, user_id=None, active_from=None):
@@ -1761,10 +1761,11 @@ class Connection(api.Connection):
                                        user_project, filters, params,
                                        exception.UsrPrjRelationUpdateFailed())
             except NoResultFound:
-                session.add(sa_models.UsrPrjRelation(user_id=user_id,
-                                                     project_id=project_id,
-                                                     consumption='0',
-                                                     domain_id=project.domain_id))
+                session.add(
+                    sa_models.UsrPrjRelation(user_id=user_id,
+                                             project_id=project_id,
+                                             consumption='0',
+                                             domain_id=project.domain_id))
 
     def _check_if_account_charged(self, account, order):
         if not account.owed and order.owed:
@@ -2326,11 +2327,9 @@ class Connection(api.Connection):
 
             # create bill
             if renew.period > 1:
-                remarks = "Renew for %s %ss" % \
-                        (renew.period, renew.method)
+                remarks = "Renew for %s %ss" % (renew.period, renew.method)
             else:
-                remarks = "Renew for %s %s" % \
-                        (renew.period, renew.method)
+                remarks = "Renew for %s %s" % (renew.period, renew.method)
 
             months = gringutils.to_months(renew.method, renew.period)
             end_time = gringutils.add_months(order.cron_time, months)

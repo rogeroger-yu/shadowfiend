@@ -58,9 +58,6 @@ class Client(object):
         resp, body = self.client.get('/projects', body=_body)
         return body
 
-    def get_order_by_resource_id():
-        pass
-
     def get_account(self, user_id):
         resp, body = self.client.get('/accounts/%s' % user_id)
         return body
@@ -133,14 +130,20 @@ class Client(object):
                      **kwargs)
         self.client.post('/orders', body=_body)
 
-    def change_order(self, order_id, change_to, cron_time=None,
+    def update_order(self, order_id, change_to, cron_time=None,
                      change_order_status=True, first_change_to=None):
         _body = dict(order_id=order_id,
                      change_to=change_to,
                      cron_time=cron_time,
                      change_order_status=change_order_status,
                      first_change_to=first_change_to)
-        self.client.put('/orders', body=_body)
+        try:
+            self.client.put('/orders', body=_body)
+            return True, None
+        except Exception:
+            msg = "Unable to update the order: %s" % order_id
+            LOG.exception(msg)
+            return False, self._reject_request_500(env, start_response)
 
     def close_order(self, order_id):
         self.client.put('/orders/%s/close' % order_id)

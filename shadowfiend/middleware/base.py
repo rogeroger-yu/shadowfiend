@@ -7,6 +7,7 @@ from oslo_log import log
 from decimal import Decimal
 
 from shadowfiend.client.v1 import client
+from shadowfiend.common import constants as const
 from shadowfiend.common import exception
 from shadowfiend.common import utils
 
@@ -64,7 +65,6 @@ class BillingProtocol(object):
         self.admin_user = self._conf_get('admin_user')
         self.admin_password = self._conf_get('admin_password')
         self.admin_tenant_name = self._conf_get('admin_tenant_name')
-
 
         self.black_list = [
             self.create_resource_action,
@@ -145,7 +145,7 @@ class BillingProtocol(object):
                     min_balance = CONF.billing.min_balance_fip
 
                 success, result = self._check_if_owed(env, start_response,
-                                                     project_id, min_balance)
+                                                      project_id, min_balance)
                 if not success:
                     return result
 
@@ -157,14 +157,14 @@ class BillingProtocol(object):
                     req.json = body
                 app_result = self.app(env, start_response)
 
-                resources = self._parse_app_result(body, app_result,
+                resources = self.parse_app_result(body, app_result,
                                                   user_id, project_id)
 
                 for resource in resources:
                     self.create_order(env, start_response, body,
-                                       unit_price, unit,
-                                       None, None,
-                                       resource)
+                                      unit_price, unit,
+                                      None, None,
+                                      resource)
 
                 return app_result
             else:
@@ -175,7 +175,8 @@ class BillingProtocol(object):
                 period = bill_params['bill_period']
                 success, result = self.get_resource_count(body)
                 if not success:
-                    return self._reject_request_400(env, start_response, result)
+                    return self._reject_request_400(
+                        env, start_response, result)
                 count = result
 
                 total_price = str(unit_price * period * count)
@@ -186,19 +187,20 @@ class BillingProtocol(object):
                     return result
 
                 # NOTE(suo): This is a flag to identify the resource's billing
-                # method in notification. For now, this is a hack to put the flag
-                # in to the role list, because only the HTTP_X_ROLES is extenable
-                # and contained in notification message. When gring-waiter receive
-                # the notification, if it contains month_billing in roles list, it
-                # will do nothing, because gring-waiter only handles the hourly
-                # billing resource. After shadowfiend is centralized, this will be
-                # removed. And this requires billing middleware places before the
+                # method in notification. For now, this is a hack to put the
+                # flag in to the role list, because only the HTTP_X_ROLES is
+                # extenable and contained in notification message. When
+                # gring-waiter receive the notification, if it contains
+                # month_billing in roles list, it will do nothing, because
+                # gring-waiter only handles the hourly billing resource.
+                # After shadowfiend is centralized, this will be removed. And
+                # this requires billing middleware places before the
                 # keystonecontext middleware in api-paste.ini
                 env['HTTP_X_ROLES'] = env['HTTP_X_ROLES'] + ',month_billing'
                 env['HTTP_X_ROLE'] = env['HTTP_X_ROLE'] + ',month_billing'
                 app_result = self.app(env, start_response)
-                resources = self._parse_app_result(body, app_result,
-                                                   user_id, project_id)
+                resources = self.parse_app_result(body, app_result,
+                                                  user_id, project_id)
 
                 if not resources:
                     success, result = self._unfreeze_balance(
@@ -219,10 +221,15 @@ class BillingProtocol(object):
         # are billed. So the deleting action of loadbalancer will affect
         # the orders of listeners.
         elif self.no_billing_resource_action(request_method, path_info, body):
+            LOG.debug('There are some resoruces that not billed')
             method_name = request_method.lower() + '_' + \
                 self.get_no_billing_resource_type(path_info, 0)
-            self.no_billing_resource_method[method_name](env, start_response,
-                                                         request_method, path_info, body)
+            self.no_billing_resource_method[method_name](
+                env,
+                start_response,
+                request_method,
+                path_info,
+                body)
         else:
             resource_id = self._get_resource_id(path_info, self.position)
 
@@ -231,19 +238,17 @@ class BillingProtocol(object):
             success, result = self._get_order_by_resource_id(
                 env, start_response, resource_id)
             if not success:
+                LOG.debug('There is no order for created resource')
                 return self.app(env, start_response)
 
             order = result
 
             if self.delete_resource_action(request_method, path_info, body):
-                # user can delete resource billed by hour directly
                 if not order.get('unit') or order.get('unit') == 'hour':
                     app_result = self.app(env, start_response)
                     if not app_result[0]:
-                        success, result = self.delete_resource_order(env,
-                                                                      start_response,
-                                                                      order['order_id'],
-                                                                      order['type'])
+                        (success, result) = self.sf_client.update_order(
+                            order['order_id'], const.STATE_DELETED)
                         if not success:
                             app_result = result
                     return app_result
@@ -265,19 +270,23 @@ class BillingProtocol(object):
                 # by-hour resource can be operated directly
                 if not order.get('unit') or order.get('unit') == 'hour':
                     min_balance = "0"
-                    success, result = self._check_if_owed(env, start_response,
-                                                         project_id, min_balance)
+                    success, result = self._check_if_owed(env,
+                                                          start_response,
+                                                          project_id,
+                                                          min_balance)
                     if not success:
                         return result
 
                     app_result = self.app(env, start_response)
-                    if self.check_if_resize_action_success(order['type'], app_result):
-                        success, result = self.resize_resource_order(env,
-                                                                     body,
-                                                                     start_response,
-                                                                     order.get('order_id'),
-                                                                     order.get('resource_id'),
-                                                                     order.get('type'))
+                    if self.check_if_resize_action_success(order['type'],
+                                                           app_result):
+                        success, result = self.resize_resource_order(
+                            env,
+                            body,
+                            start_response,
+                            order.get('order_id'),
+                            order.get('resource_id'),
+                            order.get('type'))
                         if not success:
                             app_result = result
                     return app_result
@@ -287,18 +296,25 @@ class BillingProtocol(object):
 
             elif self.stop_resource_action(request_method, path_info, body):
                 app_result = self.app(env, start_response)
-                if self.check_if_stop_action_success(order['type'], app_result):
-                    success, result = self.stop_resource_order(env, body, start_response,
-                                                               order.get('order_id'), order.get('type'))
+                if self.check_if_stop_action_success(order['type'],
+                                                     app_result):
+                    success, result = self.stop_resource_order(
+                        env,
+                        body,
+                        start_response,
+                        order.get('order_id'),
+                        order.get('type'))
                     if not success:
                         app_result = result
                 return app_result
 
             elif self.start_resource_action(request_method, path_info, body):
                 app_result = self.app(env, start_response)
-                if self.check_if_start_action_success(order['type'], app_result):
-                    success, result = self.start_resource_order(env, body, start_response,
-                                                                order.get('order_id'), order.get('type'))
+                if self.check_if_start_action_success(order['type'],
+                                                      app_result):
+                    success, result = self.start_resource_order(
+                        env, body, start_response,
+                        order.get('order_id'), order.get('type'))
                     if not success:
                         app_result = result
                 return app_result
@@ -307,20 +323,20 @@ class BillingProtocol(object):
                 if not order.get('unit') or order.get('unit') == 'hour':
                     app_result = self.app(env, start_response)
                     if not app_result[0]:
-                        success, result = self.restore_resource_order \
-                            (env, start_response,
-                             order['order_id'], order['type'])
+                        success, result = self.restore_resource_order(
+                            env, start_response,
+                            order['order_id'], order['type'])
                         if not success:
                             app_result = result
                     return app_result
 
             else:
-                # by-hour resource only can be operated when the balance is sufficient
-                # check user if owed or not
+                # by-hour resource only can be operated when the balance
+                # is sufficient check user if owed or not
                 if not order.get('unit') or order.get('unit') == 'hour':
                     min_balance = "0"
-                    success, result = self._check_if_owed(env, start_response,
-                                                         project_id, min_balance)
+                    success, result = self._check_if_owed(
+                        env, start_response, project_id, min_balance)
                     if not success:
                         return result
                     return self.app(env, start_response)
@@ -346,7 +362,8 @@ class BillingProtocol(object):
             if account['level'] == 9:
                 return True, False
             if Decimal(str(account['balance'])) <= Decimal(min_balance):
-                LOG.warning('The billing owner of project %s is owed' % project_id)
+                LOG.warning(
+                    'The billing owner of project %s is owed' % project_id)
                 return False, self._reject_request_402(env, start_response,
                                                        min_balance)
             return True, False
@@ -356,23 +373,24 @@ class BillingProtocol(object):
             return False, self._reject_request_404(
                 env, start_response, "Project %s" % project_id)
         except Exception as e:
-            msg = 'Unable to get account info from billing service, ' \
-                  'for the reason: %s' % e
+            msg = ('Unable to get account info from billing'
+                   'service, for the reason: %s' % e)
             LOG.exception(msg)
             return False, self._reject_request_500(env, start_response)
 
     def _check_if_project_has_billing_owner(self, env,
-                                           start_response, project_id):
+                                            start_response, project_id):
         try:
             account = self.sf_client.get_billing_owner(project_id)
             if not account:
-                result = self._reject_request(env, start_response,
-                                              'The project has no billing owner',
-                                              '403 Forbidden')
+                result = self._reject_request(
+                    env, start_response,
+                    'The project has no billing owner',
+                    '403 Forbidden')
                 return False, result
         except Exception as e:
-            msg = 'Unable to get account info from billing service, ' \
-                  'for the reason: %s' % e
+            msg = ('Unable to get account info from billing service, '
+                   'for the reason: %s' % e)
             LOG.exception(msg)
             return False, self._reject_request_500(env, start_response)
         return True, None
@@ -428,7 +446,9 @@ class BillingProtocol(object):
                     raise ValueError
             except ValueError:
                 msg = "bill_period %s" % bill_period
-                return False, self._reject_request_400(env, start_response, msg)
+                return False, self._reject_request_400(env,
+                                                       start_response,
+                                                       msg)
             result['bill_period'] = bill_period
 
             bill_renew = bill_params.get('bill_renew') or False
@@ -436,7 +456,9 @@ class BillingProtocol(object):
                 bill_renew = utils.true_or_false(bill_renew)
             except ValueError:
                 msg = "bill_renew %s" % bill_renew
-                return False, self._reject_request_400(env, start_response, msg)
+                return False, self._reject_request_400(env,
+                                                       start_response,
+                                                       msg)
             result['bill_renew'] = bill_renew
         return True, result
 
@@ -450,7 +472,7 @@ class BillingProtocol(object):
                 unit_price += price
         return unit_price
 
-    def _parse_app_result(self, body, result, user_id, project_id):
+    def parse_app_result(self, body, result, user_id, project_id):
         """Parse response that processed by application/middleware
 
         Parse the result to a list contains resource_id and resource_name
@@ -463,7 +485,7 @@ class BillingProtocol(object):
             return True, False
         except exception.PaymentRequired:
             LOG.warning("The balance of the billing owner of "
-                     "the project %s is not sufficient" % project_id)
+                        "the project %s is not sufficient" % project_id)
             return False, self._reject_request_402(env, start_response,
                                                    total_price)
         except exception.HTTPNotFound:
@@ -472,8 +494,8 @@ class BillingProtocol(object):
             return False, self._reject_request_404(
                 env, start_response, "Project %s" % project_id)
         except Exception as e:
-            msg = 'Unable to freeze balance for the project %s, ' \
-                  'for the reason: %s' % (project_id, e)
+            msg = ('Unable to freeze balance for the project %s, '
+                   'for the reason: %s' % (project_id, e))
             LOG.exception(msg)
             return False, self._reject_request_500(env, start_response)
 
@@ -486,7 +508,7 @@ class BillingProtocol(object):
             return True, False
         except exception.PaymentRequired:
             LOG.warning("The frozen balance of the billing owner of "
-                     "the project %s is not sufficient" % project_id)
+                        "the project %s is not sufficient" % project_id)
             return False, self._reject_request_402(env, start_response,
                                                    total_price)
         except exception.HTTPNotFound:
@@ -495,8 +517,8 @@ class BillingProtocol(object):
             return False, self._reject_request_404(
                 env, start_response, "Project %s" % project_id)
         except Exception as e:
-            msg = 'Unable to unfreeze balance for the project %s, ' \
-                  'for the reason: %s' % (project_id, e)
+            msg = ('Unable to unfreeze balance for the project %s, '
+                   'for the reason: %s' % (project_id, e))
             LOG.exception(msg)
             return False, self._reject_request_500(env, start_response)
 
@@ -505,13 +527,14 @@ class BillingProtocol(object):
         try:
             account = self.sf_client.get_billing_owner(project_id)
             if not account:
-                result = self._reject_request(env, start_response,
-                                              'The project has no billing owner',
-                                              '403 Forbidden')
+                result = self._reject_request(
+                    env, start_response,
+                    'The project has no billing owner',
+                    '403 Forbidden')
                 return False, result
         except Exception as e:
-            msg = 'Unable to get account info from billing service, ' \
-                  'for the reason: %s' % e
+            msg = ('Unable to get account info from billing service, '
+                   'for the reason: %s' % e)
             LOG.exception(msg)
             return False, self._reject_request_500(env, start_response)
 
@@ -610,7 +633,6 @@ class BillingProtocol(object):
                                     renew=renew,
                                     **resource.as_dict())
 
-
     def close_order(self, env, start_response, order_id):
         try:
             self.sf_client.close_order(order_id)
@@ -705,6 +727,7 @@ class BillingProtocol(object):
 
     def delete_resource_order(self, env, start_response,
                               order_id, resource_type):
+        # This function is not dealt with right now
         try:
             self.sf_client.delete_resource_order(order_id, resource_type)
             return True, None
@@ -776,19 +799,19 @@ class ProductItem(object):
         """
         collection = self.get_collection(env, body)
         result = self.sf_client.create_subscription(order_id,
-                                                  type=type,
-                                                  **collection.as_dict())
+                                                    type=type,
+                                                    **collection.as_dict())
         return result
 
     def get_unit_price(self, env, body, method):
         """Get product unit price"""
         collection = self.get_collection(env, body)
         product = self.sf_client.get_product(collection.product_name,
-                                           collection.service,
-                                           collection.region_id)
+                                             collection.service,
+                                             collection.region_id)
         if product:
             if 'unit_price' in product:
-                unit_price = product['unit_price'] 
+                unit_price = product['unit_price']
                 if not unit_price:
                     price_data = None
                 if not method or method == 'hour':
@@ -802,23 +825,19 @@ class ProductItem(object):
 
             def calculate_price(quantity, price_data=None):
                 if price_data and not isinstance(price_data, dict):
-                    raise exception.InvalidParameterValue('price_data should be a dict')
-            
+                    raise exception.InvalidParameterValue(
+                        'price_data should be a dict')
+
                 if price_data and 'type' in price_data:
-                    base_price = quantize_decimal(price_data.get('base_price', 0))
-            
+                    base_price = quantize_decimal(
+                        price_data.get('base_price', 0))
+
                     if (price_data['type'] == 'segmented') and (
                             'segmented' in price_data):
                         segmented_price = calculate_segmented_price(
                             quantity, price_data['segmented'])
-            
+
                         return segmented_price + base_price
             return calculate_price(collection.resource_volume, price_data)
         else:
             return 0
-
-
-
-
-
-

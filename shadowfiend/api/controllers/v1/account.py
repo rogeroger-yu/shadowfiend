@@ -36,6 +36,7 @@ from shadowfiend.services import kunkka
 LOG = log.getLogger(__name__)
 HOOK = pecan.request
 
+
 class ExistAccountController(rest.RestController):
     """Manages operations on account."""
 
@@ -78,36 +79,36 @@ class ExistAccountController(rest.RestController):
         operator = HOOK.context.user_id
 
         try:
-            charge, is_first_charge = HOOK.conductor_rpcapi.\
-                    update_account(HOOK.context,
-                                   self._id,
-                                   operator=operator,
-                                   **data.as_dict())
+            charge = HOOK.conductor_rpcapi.update_account(
+                HOOK.context,
+                self._id,
+                operator=operator,
+                **data.as_dict())
 
         except exception.NotAuthorized as e:
-            LOG.error('Fail to charge the account:%s '
-                          'due to not authorization' % self._id)
+            LOG.error('Fail to charge the account:%s'
+                      'due to not authorization' % self._id)
             raise exception.NotAuthorized()
         except Exception as e:
-            LOG.error('Fail to charge the account:%s, '
-                          'charge value: %s' % (self._id, data.value))
+            LOG.error('Fail to charge the account:%s,'
+                      'charge value: %s' % (self._id, data.value))
             raise exception.DBError(reason=e)
-        #else:
-        #    # Notifier account
-        #    if cfg.CONF.notify_account_charged:
-        #        account = HOOK.conductor_rpcapi.get_account(HOOK.context,
-        #                                                    self._id).as_dict()
-        #        contact = kunkka.get_uos_user(account['user_id'])
-        #        language = cfg.CONF.notification_language
-        #        self.notifier = notifier.NotifierService(
-        #            cfg.CONF.checker.notifier_level)
-        #        self.notifier.notify_account_charged(
-        #            HOOK.context, account, contact,
-        #            data['type'], charge.value,
-        #            bonus=bonus.value if has_bonus else 0,
-        #            operator=operator,
-        #            operator_name=HOOK.context.user_name,
-        #            remarks=remarks, language=language)
+        # else:
+        #     # Notifier account
+        #     if cfg.CONF.notify_account_charged:
+        #         account = HOOK.conductor_rpcapi.get_account(HOOK.context,
+        #                                                     self._id).as_dict()
+        #         contact = kunkka.get_uos_user(account['user_id'])
+        #         language = cfg.CONF.notification_language
+        #         self.notifier = notifier.NotifierService(
+        #             cfg.CONF.checker.notifier_level)
+        #         self.notifier.notify_account_charged(
+        #             HOOK.context, account, contact,
+        #             data['type'], charge.value,
+        #             bonus=bonus.value if has_bonus else 0,
+        #             operator=operator,
+        #             operator_name=HOOK.context.user_name,
+        #             remarks=remarks, language=language)
         return models.Charge.from_db_model(charge)
 
     @wsexpose(models.UserAccount)
@@ -170,12 +171,13 @@ class ExistAccountController(rest.RestController):
         for charge in charges:
             charges_list.append(models.Charge(**charge))
 
-        total_price, total_count = HOOK.conductor_rpcapi.\
-                get_charges_price_and_count(HOOK.context,
-                                            user_id=user_id,
-                                            type=type,
-                                            start_time=start_time,
-                                            end_time=end_time)
+        total_price, total_count = (HOOK.conductor_rpcapi.
+                                    get_charges_price_and_count(
+                                        HOOK.context,
+                                        user_id=user_id,
+                                        type=type,
+                                        start_time=start_time,
+                                        end_time=end_time))
 
         return models.Charges.transform(total_price=total_price,
                                         total_count=total_count,
@@ -265,7 +267,7 @@ class ChargeController(rest.RestController):
               wtypes.text, wtypes.text)
     def get(self, user_id=None, type=None, start_time=None,
             end_time=None, limit=None, offset=None,
-           sort_key='created_at', sort_dir='desc'):
+            sort_key='created_at', sort_dir='desc'):
         """Get all charges of all account."""
 
         check_policy(HOOK.context, "charges:all")
@@ -311,12 +313,13 @@ class ChargeController(rest.RestController):
             acharge.target = _get_user(charge.user_id)
             charges_list.append(acharge)
 
-        total_price, total_count = HOOK.conductor_rpcapi.\
-                get_charges_price_and_count(HOOK.context,
-                                            user_id=user_id,
-                                            type=type,
-                                            start_time=start_time,
-                                            end_time=end_time)
+        total_price, total_count = (HOOK.conductor_rpcapi.
+                                    get_charges_price_and_count(
+                                        HOOK.context,
+                                        user_id=user_id,
+                                        type=type,
+                                        start_time=start_time,
+                                        end_time=end_time))
         total_price = gringutils._quantize_decimal(total_price)
 
         return models.Charges.transform(total_price=total_price,
@@ -372,21 +375,23 @@ class AccountController(rest.RestController):
         if offset and offset < 0:
             raise exception.InvalidParameterValue(err="Invalid offset")
 
-        duration = shadowutils.normalize_timedelta(duration) 
+        duration = shadowutils.normalize_timedelta(duration)
         if duration:
             active_from = dateetime.datetime.utcnow() - duration
         else:
             active_from = None
 
         try:
-            accounts = HOOK.conductor_rpcapi.get_accounts(HOOK.context,
-                                                          owed=owed,
-                                                          limit=limit,
-                                                          offset=offset,
-                                                          active_from=active_from)
-            count = HOOK.conductor_rpcapi.get_accounts_count(HOOK.context,
-                                                             owed=owed,
-                                                             active_from=active_from)
+            accounts = HOOK.conductor_rpcapi.get_accounts(
+                HOOK.context,
+                owed=owed,
+                limit=limit,
+                offset=offset,
+                active_from=active_from)
+            count = HOOK.conductor_rpcapi.get_accounts_count(
+                HOOK.context,
+                owed=owed,
+                active_from=active_from)
         except exception.NotAuthorized as e:
             LOG.error('Failed to get all accounts')
             raise exception.NotAuthorized()
@@ -399,5 +404,3 @@ class AccountController(rest.RestController):
 
         return models.AdminAccounts.transform(total_count=count,
                                               accounts=accounts)
-
-

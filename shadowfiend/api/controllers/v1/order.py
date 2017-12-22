@@ -111,16 +111,27 @@ class ExistOrderController(rest.RestController):
             raise exception.InvalidParameterValue(err=err)
 
 
+class ResourceController(rest.RestController):
+    """Order related to resource."""
+
+    @wsexpose(models.Order, wtypes.text)
+    def get(self, resource_id):
+        order = HOOK.conductor_rpcapi.get_order_by_resource_id(
+            HOOK.context,
+            resource_id)
+        return models.Order.from_db_model(order)
+
+
 class OrderController(rest.RestController):
     """The controller of resources."""
 
     #summary = SummaryController()
-    #resource = ResourceController()
     #count = CountController()
     #active = ActiveController()
     #stopped = StoppedOrderCountController()
     #reset = ResetOrderController()
 
+    resource = ResourceController()
 
     @pecan.expose()
     def _lookup(self, order_id, *remainder):
@@ -218,9 +229,9 @@ class OrderController(rest.RestController):
     @wsexpose(None, body=models.OrderPutBody)
     def put(self, data):
         """Change the unit price of the order."""
-        conn = pecan.request.db_conn
         try:
-            conn.update_order(HOOK.context, **data.as_dict())
+            HOOK.conductor_rpcapi.update_order(
+                HOOK.context, **data.as_dict())
         except Exception as e:
             LOG.exception('Fail to update order: %s, for reason %s' %
                           (data.as_dict(), e))
