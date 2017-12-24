@@ -8,10 +8,10 @@ from oslo_config import cfg
 
 from shadowfiend.common import constants as const
 from shadowfiend.middleware import base
-from shadowfiend.price import pricing
 from shadowfiend.services import neutron
 
 
+CONF = cfg.CONF
 LOG = logging.getLogger(__name__)
 
 UUID_RE = r'([0-9a-f]{32}' \
@@ -27,8 +27,15 @@ class RateLimitItem(base.ProductItem):
         return const.PRODUCT_FLOATINGIP
 
     def get_resource_volume(self, env, body):
-        rate_limit = body['floatingip'].get('rate_limit', DEFAULT_RATE_LIMIT)
-        return pricing.rate_limit_to_unit(rate_limit)
+        rate_limit = int(body['floatingip'].get(
+            'rate_limit', DEFAULT_RATE_LIMIT))
+        if rate_limit == 0:
+            raise exception.InvalidParameterValue(
+                'rate limit should greater than 0')
+        if rate_limit < 1024:
+            return 1
+        else:
+            return int(rate_limit / 1024)
 
 
 class RouterItem(base.ProductItem):
@@ -124,40 +131,40 @@ class NeutronBillingProtocol(base.BillingProtocol):
             return 'listener' in result[0]
 
     def change_fip_ratelimit_action(self, method, path_info, body):
-        if method == 'PUT' \
-            and self.change_fip_ratelimit_regex.search(path_info):
+        if method == ('PUT' and
+                      self.change_fip_ratelimit_regex.search(path_info)):
             return True
         return False
 
     def switch_listener(self, method, path_info, body):
-        if method == 'PUT' \
-            and  self.update_listener_regex.search(path_info) \
-            and 'admin_state_up' in body['listener']:
+        if method == ('PUT' and
+                      self.update_listener_regex.search(path_info) and
+                      'admin_state_up' in body['listener']):
             return True
         return False
 
     def stop_listener_action(self, method, path_info, body):
-        if self.switch_listener(method, path_info, body) \
-            and not body['listener']['admin_state_up']:
+        if (self.switch_listener(method, path_info, body) and not
+                body['listener']['admin_state_up']):
             return True
         return False
 
     def start_listener_action(self, method, path_info, body):
-        if self.switch_listener(method, path_info, body) \
-            and body['listener']['admin_state_up']:
+        if (self.switch_listener(method, path_info, body) and
+                body['listener']['admin_state_up']):
             return True
         return False
 
     def delete_loadbalancer_action(self, method, path_info, body):
-        if method == 'PUT' \
-            and self.delete_loadbalancer_regex.search(path_info):
+        if (method == 'PUT' and
+                self.delete_loadbalancer_regex.search(path_info)):
             return True
         return False
 
     def delete_loadbalancer(self, env, start_response,
                             method, path_info, body):
         lb_id = self.get_resource_id(path_info, self.position)
-        lb = neutron.loadbalancer_get(lb_id, cfg.CONF.billing.region_name)
+        lb = neutron.loadbalancer_get(lb_id, CONF.billing.region_name)
         listeners = lb['listeners']
         app_result = self.app(env, start_response)
         if not app_result[0]:
@@ -165,22 +172,20 @@ class NeutronBillingProtocol(base.BillingProtocol):
                 success, result = self.get_order_by_resource_id(
                     env, start_response, listener)
                 if not success:
-                    continue;
+                    continue
 
                 order = result
-                success, result = self.delete_resource_order(env,
-                                                             start_response,
-                                                             order['order_id'],
-                                                             order['type'])
+                success, result = self.delete_resource_order(
+                    env, start_response, order['order_id'], order['type'])
                 if not success:
-                    continue;
+                    continue
 
         return app_result
 
     def update_listener(self, method, path_info, body):
-        if method == 'PUT' \
-            and  self.update_listener_regex.search(path_info) \
-            and 'connection_limit' in body['listener']:
+        if method == ('PUT' and
+                      self.update_listener_regex.search(path_info) and
+                      'connection_limit' in body['listener']):
             return True
         return False
 
@@ -230,7 +235,7 @@ class NeutronBillingProtocol(base.BillingProtocol):
             state = ext.name.split('_')[0]
             ext.obj.create_subscription(env, body, order_id, type=state)
         self.gclient.create_order(order_id,
-                                  cfg.CONF.billing.region_name,
+                                  CONF.billing.region_name,
                                   unit_price,
                                   unit,
                                   period=period,
@@ -246,30 +251,12 @@ class NeutronBillingProtocol(base.BillingProtocol):
                 unit_price += price
         return unit_price
 
-    def resize_resource_order(self, env, body, start_response, order_id,
-                              resource_id, resource_type):
-        if resource_type == const.RESOURCE_FLOATINGIP:
-            quantity = pricing.rate_limit_to_unit(
-                body['floatingip']['rate_limit'])
-        elif resource_type == const.RESOURCE_LISTENER:
-            quantity = int(body['listener']['connection_limit']) / 1000
-
-        try:
-            self.gclient.resize_resource_order(order_id,
-                                               quantity=quantity,
-                                               resource_type=resource_type)
-        except Exception as e:
-            msg = "Unable to resize the order: %s" % order_id
-            LOG.exception(msg)
-            return False, self._reject_request_500(env, start_response)
-
-        return True, None
-
 
 def filter_factory(global_conf, **local_conf):
     conf = global_conf.copy()
     conf.update(local_conf)
 
     def bill_filter(app):
+        import pdb;pdb.set_trace()
         return NeutronBillingProtocol(app, conf)
     return bill_filter

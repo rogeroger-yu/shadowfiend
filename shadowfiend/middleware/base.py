@@ -25,6 +25,15 @@ OPTS = [
     cfg.StrOpt('region_name',
                default="regionOne",
                help="The current region name"),
+    cfg.StrOpt('auth_url',
+               default="127.0.0.1",
+               help="The auth url"),
+    cfg.StrOpt('admin_user',
+               help="The admin user"),
+    cfg.StrOpt('admin_password',
+               help="The admin password"),
+    cfg.StrOpt('admin_tenant_name',
+               help="The admin tenant name"),
 ]
 CONF.register_opts(OPTS, group="billing")
 
@@ -50,13 +59,13 @@ class BillingProtocol(object):
         self.conf = conf
 
         # force to use v3 api
-        identity_uri = self._conf_get('auth_url')
-        if not identity_uri:
-            auth_host = CONF.my_ip
-            auth_port = self._conf_get('auth_port')
-            auth_protocol = self._conf_get('auth_protocol')
-            identity_uri = '%s://%s:%s' % (auth_protocol, auth_host,
-                                           auth_port)
+        try:
+            identity_uri = self._conf_get('auth_url')
+        except Exception as e:
+            msg = ('Could not get the verification information'
+                   'for the reason: %s' % e)
+            LOG.exception(msg)
+            return False, self._reject_request_500(env, start_response)
         else:
             identity_uri = identity_uri.rstrip('/')
 
@@ -265,34 +274,6 @@ class BillingProtocol(object):
                     return result
 
                 return self.app(env, start_response)
-
-            elif self.resize_resource_action(request_method, path_info, body):
-                # by-hour resource can be operated directly
-                if not order.get('unit') or order.get('unit') == 'hour':
-                    min_balance = "0"
-                    success, result = self._check_if_owed(env,
-                                                          start_response,
-                                                          project_id,
-                                                          min_balance)
-                    if not success:
-                        return result
-
-                    app_result = self.app(env, start_response)
-                    if self.check_if_resize_action_success(order['type'],
-                                                           app_result):
-                        success, result = self.resize_resource_order(
-                            env,
-                            body,
-                            start_response,
-                            order.get('order_id'),
-                            order.get('resource_id'),
-                            order.get('type'))
-                        if not success:
-                            app_result = result
-                    return app_result
-
-                # can't change resoruce billed by month/year for now
-                return self._reject_request_403(env, start_response)
 
             elif self.stop_resource_action(request_method, path_info, body):
                 app_result = self.app(env, start_response)
@@ -721,7 +702,7 @@ class BillingProtocol(object):
         if name in self.conf:
             return self.conf[name]
         try:
-            return CONF.keystone_authtoken[name]
+            return CONF.billing[name]
         except cfg.NoSuchOptError:
             return None
 
