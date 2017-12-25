@@ -16,7 +16,7 @@ LOG = logging.getLogger(__name__)
 
 UUID_RE = r'([0-9a-f]{32}' \
     r'|[0-9a-z]{8}-[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{12})'
-RESOURCE_RE = r'(routers|floatingips|lbaas/listeners)'
+RESOURCE_RE = r'(uplugin/fipratelimits|uplugin/gwratelimits|lbaas/listeners|lbaas/loadbalancers)'
 DEFAULT_RATE_LIMIT = 5 * 1024
 
 
@@ -38,13 +38,6 @@ class RateLimitItem(base.ProductItem):
             return int(rate_limit / 1024)
 
 
-class RouterItem(base.ProductItem):
-    service = const.SERVICE_NETWORK
-
-    def get_product_name(self, body):
-        return const.PRODUCT_ROUTER
-
-
 class ConnectionLimitItem(base.ProductItem):
     service = const.SERVICE_NETWORK
 
@@ -64,9 +57,10 @@ class NeutronBillingProtocol(base.BillingProtocol):
         self.create_resource_regex = re.compile(
             r'^/%s([.][^.]+)?$' % RESOURCE_RE, re.UNICODE)
 
-        self.change_fip_ratelimit_regex = re.compile(
-            r'^/(floatingips)/%s/'
-            r'update_floatingip_ratelimit([.][^.]+)?$' % (UUID_RE))
+        self.update_fipratelimit_regex = re.compile(
+            r'^/uplugin/fipratelimits/%s([.][^.]+)?$' % (UUID_RE))
+        self.update_gwratelimit_regex = re.compile(
+            r'^/uplugin/gwratelimits/%s([.][^.]+)?$' % (UUID_RE))
         self.update_listener_regex = re.compile(
             r'^/(lbaas/listeners)/%s([.][^.]+)?$' % (UUID_RE))
 
@@ -81,14 +75,12 @@ class NeutronBillingProtocol(base.BillingProtocol):
         ]
         self.resource_regexs = [
             self.resource_regex,
-            self.change_fip_ratelimit_regex,
             self.update_listener_regex,
         ]
         self.no_billing_resource_regexs = [
             self.delete_loadbalancer_regex,
         ]
         self.resize_resource_actions = [
-            self.change_fip_ratelimit_action,
             self.update_listener,
         ]
         self.stop_resource_actions = [
@@ -107,20 +99,15 @@ class NeutronBillingProtocol(base.BillingProtocol):
 
         self.product_items = {}
         self._setup_product_extensions(self.product_items)
+        self.neutron_client = neutron.NeutronClient()
 
     def _setup_product_extensions(self, product_items):
-        names = ['floatingip', 'router', 'listener']
+        names = ['fipratelimit', 'gwratelimit', 'listener', 'loadbalancer']
         for name in names:
             product_items[name] = extension.ExtensionManager(
                 namespace='shadowfiend.%s.product_items' % name,
                 invoke_on_load=True,
-                invoke_args=(self.gclient,))
-
-    def check_if_resize_action_success(self, resource_type, result):
-        if resource_type == const.RESOURCE_LISTENER:
-            return 'listener' in result[0]
-        elif resource_type == const.RESOURCE_FLOATINGIP:
-            return 'rate_limit' in result[0]
+                invoke_args=(self.sf_client,))
 
     def check_if_stop_action_success(self, resource_type, result):
         if resource_type == const.RESOURCE_LISTENER:
@@ -164,7 +151,8 @@ class NeutronBillingProtocol(base.BillingProtocol):
     def delete_loadbalancer(self, env, start_response,
                             method, path_info, body):
         lb_id = self.get_resource_id(path_info, self.position)
-        lb = neutron.loadbalancer_get(lb_id, CONF.billing.region_name)
+        lb = self.neutron_client.loadbalancer_get(lb_id,
+                                                  CONF.billing.region_name)
         listeners = lb['listeners']
         app_result = self.app(env, start_response)
         if not app_result[0]:
@@ -193,22 +181,22 @@ class NeutronBillingProtocol(base.BillingProtocol):
         resources = []
         try:
             result = json.loads(result[0])
-            if 'floatingip' in result:
-                fip = result['floatingip']
+            if 'fipratelimit' in result:
+                fip = result['fipratelimit']
                 resources.append(base.Resource(
                     resource_id=fip['id'],
                     resource_name=fip.get('name'),
-                    type=const.RESOURCE_FLOATINGIP,
+                    type=const.RESOURCE_FIPRATELIMIT,
                     status=const.STATE_RUNNING,
                     user_id=user_id,
                     project_id=project_id
                 ))
-            elif 'router' in result:
-                router = result['router']
+            elif 'gwratelimit' in result:
+                gwratelimit = result['gwratelimit']
                 resources.append(base.Resource(
-                    resource_id=router['id'],
-                    resource_name=router.get('name'),
-                    type=const.RESOURCE_ROUTER,
+                    resource_id=gwratelimit['id'],
+                    resource_name=gwratelimit.get('name'),
+                    type=const.RESOURCE_GWRATELIMIT,
                     status=const.STATE_RUNNING,
                     user_id=user_id,
                     project_id=project_id
@@ -219,6 +207,16 @@ class NeutronBillingProtocol(base.BillingProtocol):
                     resource_id=listener['id'],
                     resource_name=listener.get('name'),
                     type=const.RESOURCE_LISTENER,
+                    status=const.STATE_RUNNING,
+                    user_id=user_id,
+                    project_id=project_id
+                ))
+            elif 'loadbalancer' in result:
+                loadbalancer = result['loadbalancer']
+                resources.append(base.Resource(
+                    resource_id=loadbalancer['id'],
+                    resource_name=loadbalancer.get('name'),
+                    type=const.RESOURCE_LOADBALANCER,
                     status=const.STATE_RUNNING,
                     user_id=user_id,
                     project_id=project_id
@@ -234,13 +232,13 @@ class NeutronBillingProtocol(base.BillingProtocol):
         for ext in self.product_items[resource.type].extensions:
             state = ext.name.split('_')[0]
             ext.obj.create_subscription(env, body, order_id, type=state)
-        self.gclient.create_order(order_id,
-                                  CONF.billing.region_name,
-                                  unit_price,
-                                  unit,
-                                  period=period,
-                                  renew=renew,
-                                  **resource.as_dict())
+        self.sf_client.create_order(order_id,
+                                    CONF.billing.region_name,
+                                    unit_price,
+                                    unit,
+                                    period=period,
+                                    renew=renew,
+                                    **resource.as_dict())
 
     def get_order_unit_price(self, env, body, method):
         unit_price = 0
@@ -257,6 +255,5 @@ def filter_factory(global_conf, **local_conf):
     conf.update(local_conf)
 
     def bill_filter(app):
-        import pdb;pdb.set_trace()
         return NeutronBillingProtocol(app, conf)
     return bill_filter

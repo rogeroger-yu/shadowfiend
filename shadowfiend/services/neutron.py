@@ -34,7 +34,7 @@ class NeutronClient(BaseClient):
 
         self.neutron_client = neutron_client.Client(
             session=self.session,
-            auth_url=self.auth.auth_url)
+            auth=self.auth)
 
     def subnet_list(self, project_id, region_name=None):
         subnets = self.neutron_client.list_subnets(tenant_id=project_id).get('subnets')

@@ -49,7 +49,7 @@ def set_context(func):
 class ProcessorService(rpc_service.Service):
     def __init__(self, *args, **kwargs):
         super(ProcessorService, self).__init__(*args, **kwargs)
-        #self.fetch = service.fetcher
+        # self.fetch = service.fetcher
 
     def start(self, *args, **kwargs):
         super(ProcessorService, self).start(*args, **kwargs)
@@ -62,11 +62,11 @@ class ProcessorService(rpc_service.Service):
                 initial_delay = None
 
             pt = ProcessorPeriodTasks(CONF)
-            self.tg.add_dynamic_timer(pt.run_periodic_tasks,
-                                      initial_delay=initial_delay,
-                                      periodic_interval_max=
-                                      self.periodic_interval_max,
-                                      context=None)
+            self.tg.add_dynamic_timer(
+                pt.run_periodic_tasks,
+                initial_delay=initial_delay,
+                periodic_interval_max=self.periodic_interval_max,
+                context=None)
 
 
 class ProcessorPeriodTasks(periodic_task.PeriodicTasks):
@@ -79,9 +79,9 @@ class ProcessorPeriodTasks(periodic_task.PeriodicTasks):
         self.gnocchi_fetcher = service.fetcher.GnocchiFetcher()
 
         # services test fetcher
-        #self.cinder_fetcher = service.fetcher.CinderFetcher()
-        #self.nova_fetcher = service.fetcher.NovaFetcher()
-        #self.glance_fetcher = service.fetcher.GlanceFetcher()
+        # self.cinder_fetcher = service.fetcher.CinderFetcher()
+        # self.nova_fetcher = service.fetcher.NovaFetcher()
+        # self.glance_fetcher = service.fetcher.GlanceFetcher()
         self.neutron_fetcher = service.fetcher.NeutronFetcher()
 
         # DLM
@@ -113,21 +113,21 @@ class ProcessorPeriodTasks(periodic_task.PeriodicTasks):
     def Primary_Period(self, ctx):
         LOG.info("************************")
         LOG.info("Processing the correspondence between tenants and accounts")
-        
-        #fetch billing enable tenants
+
+        # fetch billing enable tenants
         tenants = self.keystone_fetcher.get_rate_tenants()
         LOG.info("Tenants are %s" % str(tenants))
 
-        #-----------------cinder client test---------------------------
-        #self.cinder_fetcher.get_volumes(volume_id='0296d18e-32dc-4ce8-9d37-aa98979128fe')
-        #self.nova_fetcher.flavor_list()
-        #self.glance_fetcher.image_list()
-        self.neutron_fetcher.networks_list('3427804b-70d9-4a99-9bac-39b6fbab0184')
+        # -----------------cinder client test---------------------------
+        # self.cinder_fetcher.get_volumes(volume_id='0296d18e-32dc-4ce8-9d37-aa98979128fe')
+        # self.nova_fetcher.flavor_list()
+        # self.glance_fetcher.image_list()
+        self.neutron_fetcher.networks_list(
+            '3427804b-70d9-4a99-9bac-39b6fbab0184')
 
-        #-----------------cinder client test---------------------------
+        # -----------------cinder client test---------------------------
 
         self._check_state(tenants[0])
-
 
 #        while len(tenants):
 #            for tenant in tenants[:]:
@@ -148,8 +148,6 @@ class ProcessorPeriodTasks(periodic_task.PeriodicTasks):
 #        # FIXME(sheeprine): We may cause a drift here
 #        eventlet.sleep(CONF.collect.period)
 
-
-        #check every tenant's timestamp is prepared, push into thread queue
-
+        # check every tenant's timestamp is prepared, push into thread queue
 
         LOG.info("Process successfully in this period")

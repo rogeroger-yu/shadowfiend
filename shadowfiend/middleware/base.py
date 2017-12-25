@@ -447,11 +447,11 @@ class BillingProtocol(object):
         """Caculate unit price of this order
         """
         unit_price = 0
-        for ext in self.product_items.extensions:
-            if ext.name.startswith('running'):
-                price = ext.obj.get_unit_price(env, body, method)
-                unit_price += price
-        return unit_price
+        # for ext in self.product_items.extensions:
+        #     if ext.name.startswith('running'):
+        #         price = ext.obj.get_unit_price(env, body, method)
+        #         unit_price += price
+        # return unit_price
 
     def parse_app_result(self, body, result, user_id, project_id):
         """Parse response that processed by application/middleware
@@ -719,9 +719,6 @@ class BillingProtocol(object):
 
     def get_resource_count(self, body):
         return True, 1
-
-    def check_if_resize_action_success(self, resource_type, result):
-        return not result[0]
 
     def check_if_stop_action_success(self, resource_type, result):
         return not result[0]
