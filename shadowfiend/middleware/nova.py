@@ -1,21 +1,38 @@
-import json
-import re
-import logging
-from stevedore import extension
-from oslo_config import cfg
+# -*- coding: utf-8 -*-
+# Copyright 2014 Objectif Libre
+#
+#    Licensed under the Apache License, Version 2.0 (the "License"); you may
+#    not use this file except in compliance with the License. You may obtain
+#    a copy of the License at
+#
+#         http://www.apache.org/licenses/LICENSE-2.0
+#
+#    Unless required by applicable law or agreed to in writing, software
+#    distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+#    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+#    License for the specific language governing permissions and limitations
+#    under the License.
 
+import json
+import logging
+import re
+
+from oslo_config import cfg
 from shadowfiend.common import constants as const
 from shadowfiend.common import exception
-from shadowfiend.middleware import base
 from shadowfiend.common import memorycache
-from shadowfiend.services.nova import NovaClient
+from shadowfiend.middleware import base
 from shadowfiend.services import glance
+from shadowfiend.services import nova
+from shadowfiend.services.nova import NovaClient
+from stevedore import extension
 
 LOG = logging.getLogger(__name__)
 
-UUID_RE = r"([0-9a-f]{32}|[0-9a-z]{8}-[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{12})"
-RESOURCE_RE = r"(os-volumes|os-snapshots|os-floating-ips|os-floating-ips-bulk|images|servers)"
-
+UUID_RE = (r"([0-9a-f]{32}|[0-9a-z]{8}-[0-9a-z]{4}-"
+           "[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{12})")
+RESOURCE_RE = (r"(os-volumes|os-snapshots|os-floating-ips"
+               "|os-floating-ips-bulk|images|servers)")
 
 MC = None
 
@@ -82,7 +99,7 @@ class LicenseItem(base.ProductItem):
     def get_product_name(self, body):
         # NOTE(chengkun): if we start instance from volume, there
         # are no License, so we should not use 'imageRef'
-        if body['server'].has_key('imageRef'):
+        if 'imageRef' in body['server']:
             image_id = body['server']['imageRef']
             image = _get_image(image_id)
             product_name = 'license:%s' % image['image_label']
@@ -115,7 +132,7 @@ class NovaBillingProtocol(base.BillingProtocol):
         self.server_action_regex = re.compile(
             r"^/%s/(servers)/%s/action([.][^.]+)?$" % (UUID_RE, UUID_RE))
         self.attach_volume_to_server_regex = re.compile(
-            r"^/%s/(servers)/%s/os-volume_attachments([.][^.]+)?$" % \
+            r"^/%s/(servers)/%s/os-volume_attachments([.][^.]+)?$" %
             (UUID_RE, UUID_RE))
 
         self.position = 1
@@ -150,55 +167,54 @@ class NovaBillingProtocol(base.BillingProtocol):
             invoke_args=(self.sf_client,))
 
     def other_server_actions(self, method, path_info, body):
-        if method == "POST" and \
-                self.server_action_regex.search(path_info) and \
-                (body.has_key('createImage') or \
-                 body.has_key('addFloatingIp') or \
-                 body.has_key('reboot') or \
-                 body.has_key('rebuild') or \
-                 body.has_key('unpause') or \
-                 body.has_key('resume') or \
-                 body.has_key('unshelve') or \
-                 body.has_key('unrescue')):
+        if (method == "POST" and
+            self.server_action_regex.search(path_info) and
+            (('createImage' in body) or
+             ('addFloatingIp' in body) or
+             ('reboot' in body) or
+             ('rebuild' in body) or
+             ('unpause' in body) or
+             ('resume' in body) or
+             ('unshelve' in body) or
+             ('unrescue' in body))):
             return True
         return False
 
     def start_server_action(self, method, path_info, body):
-        if method == "POST" and \
-            self.server_action_regex.search(path_info) and \
-            (body.has_key('os-start') or \
-             body.has_key('unshelve') or \
-             body.has_key('unpause')):
+        if (method == "POST" and
+            self.server_action_regex.search(path_info) and
+            (('os-start' in body) or
+             ('unshelve' in body) or
+             ('unpause' in body))):
             return True
         return False
 
     def stop_server_action(self, method, path_info, body):
-        if method == "POST" and \
-            self.server_action_regex.search(path_info) and \
-            (body.has_key('os-stop') or \
-             body.has_key('shelve') or \
-             body.has_key('pause')):
+        if (method == "POST" and
+            self.server_action_regex.search(path_info) and
+            (('os-stop' in body) or
+             ('shelve' in body) or
+             ('pause' in body))):
             return True
         return False
 
     def resize_server_action(self, method, path_info, body):
-        if method == "POST" and \
-                self.server_action_regex.search(path_info) and \
-                (body.has_key('resize') or \
-                 body.has_key('localResize')):
+        if (method == "POST" and
+            self.server_action_regex.search(path_info) and
+            (('resize' in body) or
+             ('localResize' in body))):
             return True
         return False
 
     def attach_volume_to_server_action(self, method, path_info, body):
-        if method == "POST" \
-            and self.attach_volume_to_server_regex.search(path_info):
+        if (method == "POST" and
+                self.attach_volume_to_server_regex.search(path_info)):
             return True
         return False
 
     def restore_server_action(self, method, path_info, body):
-        if method == "POST" \
-            and self.server_action_regex.search(path_info) and \
-            body.has_key('restore'):
+        if (method == "POST" and 'restore' in body and
+                self.server_action_regex.search(path_info)):
             return True
         return False
 
@@ -207,8 +223,8 @@ class NovaBillingProtocol(base.BillingProtocol):
         if count < 1:
             return False, "max_count must be >= 1"
         if count > 1 and not body['server'].get('return_reservation_id'):
-            msg = "must set return_reservation_id to true in body " \
-                  "if want to create multiple servers"
+            msg = ("must set return_reservation_id to true in body "
+                   "if want to create multiple servers")
             return False, msg
         return True, count
 
@@ -218,7 +234,7 @@ class NovaBillingProtocol(base.BillingProtocol):
         if count == 1:
             try:
                 if body['server'].get('return_reservation_id'):
-                    resv_id =json.loads(result[0])['reservation_id']
+                    resv_id = json.loads(result[0])['reservation_id']
                     servers = NovaClient.server_list_by_resv_id(
                         resv_id, region_name=cfg.CONF.billing.region_name)
                     server = servers[0].to_dict()
@@ -266,19 +282,21 @@ class NovaBillingProtocol(base.BillingProtocol):
 
         region_id = cfg.CONF.billing.region_name
 
-        new_flavor = '%s:%s' % (const.PRODUCT_INSTANCE_TYPE_PREFIX,
-                                NovaClient.flavor_get(region_id, new_flavor).name)
-        old_flavor = '%s:%s' % (const.PRODUCT_INSTANCE_TYPE_PREFIX,
-                                NovaClient.flavor_get(region_id, old_flavor).name)
+        new_flavor = ('%s:%s' %
+                      (const.PRODUCT_INSTANCE_TYPE_PREFIX,
+                       NovaClient.flavor_get(region_id, new_flavor).name))
+        old_flavor = ('%s:%s' %
+                      (const.PRODUCT_INSTANCE_TYPE_PREFIX,
+                       NovaClient.flavor_get(region_id, old_flavor).name))
         service = const.SERVICE_COMPUTE
 
         try:
             self.sf_client.resize_resource_order(order_id,
-                                               resource_type=resource_type,
-                                               new_flavor=new_flavor,
-                                               old_flavor=old_flavor,
-                                               service=service,
-                                               region_id=region_id)
+                                                 resource_type=resource_type,
+                                                 new_flavor=new_flavor,
+                                                 old_flavor=old_flavor,
+                                                 service=service,
+                                                 region_id=region_id)
         except Exception:
             msg = "Unable to resize the order: %s" % order_id
             LOG.exception(msg)

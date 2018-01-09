@@ -20,7 +20,6 @@ from oslo_config import cfg
 from oslo_log import log
 
 from keystoneauth1 import loading as ks_loading
-from keystoneauth1 import session as ks_session 
 
 from shadowfiend.client.v1 import client
 from shadowfiend.common.exception import ShadowfiendException
@@ -36,9 +35,13 @@ class BaseClient(object):
     def __init__(self):
         ks_loading.register_session_conf_options(CONF, SERVICE_CLIENT_OPTS)
         ks_loading.register_auth_conf_options(CONF, SERVICE_CLIENT_OPTS)
-
-        self.auth = ks_loading.load_auth_from_conf_options(CONF, SERVICE_CLIENT_OPTS)
-        self.session = ks_loading.load_session_from_conf_options(CONF, SERVICE_CLIENT_OPTS, auth=self.auth)
+        self.auth = ks_loading.load_auth_from_conf_options(
+            CONF,
+            SERVICE_CLIENT_OPTS)
+        self.session = ks_loading.load_session_from_conf_options(
+            CONF,
+            SERVICE_CLIENT_OPTS,
+            auth=self.auth)
 
 
 class Resource(object):
@@ -75,19 +78,22 @@ class Resource(object):
         return '%s: %s: %s' % (self.resource_type, self.name, self.id)
 
     def __eq__(self, other):
-        return self.id == other.id and self.original_status == other.original_status
+        return (self.id == other.id and
+                self.original_status == other.original_status)
 
 
 def wrap_exception(exc_type=None, with_raise=False):
-    """ Wrap exception around resource method
+    """Wrap exception around resource method
 
     This decorator wraps a method to catch any exceptions that may get thrown.
     It logs the exception, and may sends message to notification system.
 
-    In every normal situation, there will not exception be raised. When it requests
-    a non-exists resource, it will return None instead of exception. Only when any of the services
-    is not avaliable, it will raise an exception to stop the further execution.
+    In every normal situation, there will not exception be raised.
+    When it requests a non-exists resource, it will return None instead of
+    exception. Only when any of the services is not avaliable,
+    it will raise an exception to stop the further execution.
     """
+
     def inner(f):
         def wrapped(uuid, *args, **kwargs):
             try:
@@ -102,28 +108,35 @@ def wrap_exception(exc_type=None, with_raise=False):
                         int(account['level']) != 9) or (
                         order['unit'] in ['month', 'year'] and
                         order['owed']):
-                        LOG.warn("The resource: %s is indeed owed, can be execute"
-                                 "the action: %s", uuid, f.__name__)
+                        LOG.warn("The resource: %s is indeed owed, can be"
+                                 "execute the action: %s", uuid, f.__name__)
                         return f(uuid, *args, **kwargs)
                     else:
-                        LOG.warn("The resource: %s is not owed, should not execute"
-                                 "the action: %s", uuid, f.__name__)
+                        LOG.warn("The resource: %s is not owed, should not"
+                                 "execute the action: %s", uuid, f.__name__)
                 else:
                     return f(uuid, *args, **kwargs)
             except Exception as e:
                 msg = None
-                if exc_type == 'single' or exc_type == 'delete' or exc_type == 'stop':
-                    msg = 'Fail to do %s for resource: %s, reason: %s' % (f.__name__, uuid, e)
+                if (exc_type == 'single' or exc_type == 'delete' or
+                        (exc_type == 'stop')):
+                    msg = ('Fail to do %s for resource: %s, reason: %s' %
+                           (f.__name__, uuid, e))
                 elif exc_type == 'bulk':
-                    msg = 'Fail to do %s for account: %s, reason: %s' % (f.__name__, uuid, e)
+                    msg = ('Fail to do %s for account: %s, reason: %s' %
+                           (f.__name__, uuid, e))
                 elif exc_type == 'list':
-                    msg = 'Fail to do %s for account: %s, reason: %s' % (f.__name__, uuid, e)
+                    msg = ('Fail to do %s for account: %s, reason: %s' %
+                           (f.__name__, uuid, e))
                 elif exc_type == 'get':
-                    msg = 'Fail to do %s for resource: %s, reason: %s' % (f.__name__, uuid, e)
+                    msg = ('Fail to do %s for resource: %s, reason: %s' %
+                           (f.__name__, uuid, e))
                 elif exc_type == 'put':
-                    msg = 'Fail to do %s for resource: %s, reason: %s' % (f.__name__, uuid, e)
+                    msg = ('Fail to do %s for resource: %s, reason: %s' %
+                           (f.__name__, uuid, e))
                 else:
-                    msg = 'Fail to do %s, reason: %s' % (f.__name__, e)
+                    msg = ('Fail to do %s, reason: %s' %
+                           (f.__name__, e))
                 if with_raise:
                     raise ShadowfiendException(message=msg)
                 else:

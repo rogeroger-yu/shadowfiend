@@ -13,15 +13,17 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+from novaclient import client as nova_client
+from novaclient.exceptions import NotFound
+
 from oslo_config import cfg
 from oslo_log import log
 
-from novaclient import client as nova_client
-from shadowfiend.services import BaseClient
-from shadowfiend.services import Resource
 from shadowfiend.common import constants as const
 from shadowfiend.common import timeutils
 from shadowfiend.common import utils
+from shadowfiend.services import BaseClient
+from shadowfiend.services import Resource
 
 
 LOG = log.getLogger(__name__)
@@ -44,10 +46,10 @@ class NovaClient(BaseClient):
 
     def flavor_get(self, region_name, flavor_id):
         return self.nova_client.flavors.get(flavor_id)
- 
+
     def image_get(self, region_name, image_id):
         return self.nova_client.images.get(image_id)
- 
+
     def server_get(self, instance_id, region_name=None):
         try:
             server = self.nova_client.servers.get(instance_id)
@@ -60,13 +62,15 @@ class NovaClient(BaseClient):
                       original_status=server.status,
                       resource_type=const.RESOURCE_INSTANCE,
                       flavor=server.flavor)
-    
-    def server_list_by_resv_id(self, resv_id, region_name=None, detailed=False):
+
+    def server_list_by_resv_id(self, resv_id,
+                               region_name=None, detailed=False):
         search_opts = {'reservation_id': resv_id,
                        'all_tenants': 1}
         return self.nova_client.servers.list(detailed, search_opts)
-    
-    def server_list(self, project_id, region_name=None, detailed=True, project_name=None):
+
+    def server_list(self, project_id, region_name=None,
+                    detailed=True, project_name=None):
         search_opts = {'all_tenants': 1,
                        'project_id': project_id}
         servers = self.nova_client.servers.list(detailed, search_opts)
@@ -76,20 +80,22 @@ class NovaClient(BaseClient):
             image = self.image_get(region_name, server.image['id'])
             created_at = utils.format_datetime(server.created)
             status = utils.transform_status(server.status)
-            formatted_servers.append(Server(id=server.id,
-                                            name=server.name,
-                                            flavor_name=flavor.name,
-                                            flavor_id=flavor.id,
-                                            disk_gb=getattr(image, "OS-EXT-IMG-SIZE:size") / (1024 * 1024 * 1024),
-                                            image_name=image.name,
-                                            image_id=image.id,
-                                            status=status,
-                                            original_status=server.status,
-                                            resource_type=const.RESOURCE_INSTANCE,
-                                            user_id=server.user_id,
-                                            project_id=server.tenant_id,
-                                            project_name=project_name,
-                                            created_at=created_at))
+            formatted_servers.append(
+                Server(id=server.id,
+                       name=server.name,
+                       flavor_name=flavor.name,
+                       flavor_id=flavor.id,
+                       disk_gb=(getattr(image, "OS-EXT-IMG-SIZE:size") /
+                                (1024 * 1024 * 1024)),
+                       image_name=image.name,
+                       image_id=image.id,
+                       status=status,
+                       original_status=server.status,
+                       resource_type=const.RESOURCE_INSTANCE,
+                       user_id=server.user_id,
+                       project_id=server.tenant_id,
+                       project_name=project_name,
+                       created_at=created_at))
         return formatted_servers
 
 
@@ -114,10 +120,10 @@ class Server(Resource):
         return msg
 
     def to_env(self):
-        return dict(HTTP_X_USER_ID=self.user_id, HTTP_X_PROJECT_ID=self.project_id)
+        return dict(HTTP_X_USER_ID=self.user_id,
+                    HTTP_X_PROJECT_ID=self.project_id)
 
     def to_body(self):
         body = {}
         body['server'] = dict(imageRef=self.image_id, flavorRef=self.flavor_id)
         return body
-

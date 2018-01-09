@@ -32,8 +32,8 @@ class API(rpc_service.API):
                                   topic=cfg.CONF.processor.topic)
 
     def test(self):
-        #return 'test RPC'
-        #return self._client.cast({}, 'test')
+        # return 'test RPC'
+        # return self._client.cast({}, 'test')
         return self._call('test', arg='test_arg')
 
 #    def cluster_create_async(self, cluster, create_timeout):

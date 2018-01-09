@@ -12,17 +12,17 @@
 #    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 #    License for the specific language governing permissions and limitations
 #    under the License.
-#
-# @author: Stéphane Albert
-#
+
 """
 Time calculations functions
 
 We're mostly using oslo_utils for time calculations but we're encapsulating it
 to ease maintenance in case of library modifications.
 """
+
 import calendar
 import datetime
+import iso8601
 import sys
 
 from oslo_utils import timeutils
@@ -181,3 +181,17 @@ def refresh_stevedore(namespace=None):
             del cache[namespace]
     else:
         cache.clear()
+
+
+def normalize_timedelta(duration):
+    if not duration:
+        return
+    unit = duration[-1]
+    value = duration[:-1]
+    if unit == 'm':
+        return datetime.timedelta(minutes=float(value))
+    if unit == 'h':
+        return datetime.timedelta(hours=float(value))
+    if unit == 'd':
+        return datetime.timedelta(days=float(value))
+    raise ValueError("unsupport time unit")

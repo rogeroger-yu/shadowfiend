@@ -1,16 +1,33 @@
+# -*- coding: utf-8 -*-
+# Copyright 2014 Objectif Libre
+#
+#    Licensed under the Apache License, Version 2.0 (the "License"); you may
+#    not use this file except in compliance with the License. You may obtain
+#    a copy of the License at
+#
+#         http://www.apache.org/licenses/LICENSE-2.0
+#
+#    Unless required by applicable law or agreed to in writing, software
+#    distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+#    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+#    License for the specific language governing permissions and limitations
+#    under the License.
+
 import json
 import re
-from stevedore import extension
+
 from oslo_config import cfg
 from oslo_log import log
 from shadowfiend.common import constants as const
 from shadowfiend.middleware import base
 from shadowfiend.services.cinder import CinderClient
+from stevedore import extension
 
 CONF = cfg.CONF
 LOG = log.getLogger(__name__)
 
-UUID_RE = r"([0-9a-f]{32}|[0-9a-z]{8}-[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{12})"
+UUID_RE = (r"([0-9a-f]{32}|[0-9a-z]{8}-[0-9a-z]{4}"
+           "-[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{12})")
 RESOURCE_RE = r"(volumes|snapshots)"
 
 
@@ -33,12 +50,14 @@ class SizeItem(base.ProductItem):
             return body['volume']['size']
         elif 'snapshot' in body:
             try:
-                volume = CinderClient.volume_get(body['snapshot']['volume_id'],
-                                                 CONF.billing.region_name)
+                volume = CinderClient.volume_get(
+                    body['snapshot']['volume_id'],
+                    CONF.billing.region_name)
             except Exception:
                 # INFO(chengkun): just use for checker service
-                volume = CinderClient.snapshot_get(body['snapshot']['snapshot_id'],
-                                                   CONF.billing.region_name)
+                volume = CinderClient.snapshot_get(
+                    body['snapshot']['snapshot_id'],
+                    CONF.billing.region_name)
             return volume.size
 
 
@@ -47,11 +66,14 @@ class CinderBillingProtocol(base.BillingProtocol):
     def __init__(self, app, conf):
         super(CinderBillingProtocol, self).__init__(app, conf)
         self.resource_regex = re.compile(
-            r"^/%s/%s/%s([.][^.]+)?$" % (UUID_RE, RESOURCE_RE, UUID_RE), re.UNICODE)
+            r"^/%s/%s/%s([.][^.]+)?$" %
+            (UUID_RE, RESOURCE_RE, UUID_RE), re.UNICODE)
         self.create_resource_regex = re.compile(
-            r"^/%s/%s([.][^.]+)?$" % (UUID_RE, RESOURCE_RE), re.UNICODE)
+            r"^/%s/%s([.][^.]+)?$" %
+            (UUID_RE, RESOURCE_RE), re.UNICODE)
         self.volume_action_regex = re.compile(
-            r"^/%s/(volumes)/%s/action$" % (UUID_RE, UUID_RE))
+            r"^/%s/(volumes)/%s/action$" %
+            (UUID_RE, UUID_RE))
         self.position = 2
         self.black_list += [
             self.attach_volume_action,
@@ -70,16 +92,16 @@ class CinderBillingProtocol(base.BillingProtocol):
             invoke_args=(self.sf_client,))
 
     def attach_volume_action(self, method, path_info, body):
-        if method == "POST" and \
-                self.volume_action_regex.search(path_info) and \
-                body.has_key('os-attach'):
+        if method == ("POST" and
+                      self.volume_action_regex.search(path_info) and
+                      ('os-attach' in body)):
             return True
         return False
 
     def extend_volume_action(self, method, path_info, body):
-        if method == "POST" and \
-                self.volume_action_regex.search(path_info) and \
-                body.has_key('os-extend'):
+        if method == ("POST" and
+                      self.volume_action_regex.search(path_info) and
+                      ('os-extend' in body)):
             return True
         return False
 
@@ -90,9 +112,9 @@ class CinderBillingProtocol(base.BillingProtocol):
             if 'volume' in result:
                 volume = result['volume']
                 if 'display_name' in volume:
-                    resource_name = volume['display_name'] # v1
+                    resource_name = volume['display_name']
                 elif 'name' in volume:
-                    resource_name = volume['name'] # v2
+                    resource_name = volume['name']
                 else:
                     resource_name = None
                 resources.append(base.Resource(

@@ -17,13 +17,11 @@
 SQLAlchemy models for Shadowfiend data
 """
 
-import json
 import urlparse
-from oslo_config import cfg
 
+from oslo_config import cfg
 from sqlalchemy import Column, Integer, String
-from sqlalchemy import DateTime, Index, DECIMAL, Boolean, Text
-from sqlalchemy.types import TypeDecorator
+from sqlalchemy import DateTime, Index, DECIMAL, Boolean
 from sqlalchemy.ext.declarative import declarative_base
 
 from shadowfiend.common import timeutils

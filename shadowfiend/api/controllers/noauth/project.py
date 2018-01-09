@@ -1,17 +1,28 @@
+# -*- coding: utf-8 -*-
+# Copyright 2017 Openstack Foundation.
+#
+#    Licensed under the Apache License, Version 2.0 (the "License"); you may
+#    not use this file except in compliance with the License. You may obtain
+#    a copy of the License at
+#
+#         http://www.apache.org/licenses/LICENSE-2.0
+#
+#    Unless required by applicable law or agreed to in writing, software
+#    distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+#    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+#    License for the specific language governing permissions and limitations
+#    under the License.
+
 import pecan
-import wsme
 
-from pecan import rest
-from pecan import request
-from wsmeext.pecan import wsexpose
-from wsme import types as wtypes
-
-from oslo_config import cfg
 from oslo_log import log
+from pecan import rest
 
 from shadowfiend.api.controllers.v1 import models
-from shadowfiend.db import models as db_models
 from shadowfiend.common import exception
+from shadowfiend.db import models as db_models
+from wsme import types as wtypes
+from wsmeext.pecan import wsexpose
 
 
 LOG = log.getLogger(__name__)
@@ -41,7 +52,7 @@ class ExistProjectController(rest.RestController):
         try:
             project = HOOK.conductor_rpcapi.get_project(HOOK.context,
                                                         project_id=self._id)
-        except Exception as e:
+        except Exception:
             LOG.error('project %s no found' % self._id)
             raise exception.ProjectNotFound(project_id=self._id)
         return project
@@ -71,9 +82,9 @@ class ProjectController(rest.RestController):
         return ExistProjectController(project_id), remainder
 
     @wsexpose(None, body=models.Project)
-    def post(self, data):                 
+    def post(self, data):
         """Create a new project."""
-        try:                           
+        try:
             project = data.as_dict()
             return HOOK.conductor_rpcapi.create_project(HOOK.context, project)
         except Exception:

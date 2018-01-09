@@ -25,7 +25,8 @@ SERVICE_OPTS = [
                help='The queue to add conductor tasks to.'),
     cfg.IntOpt(
         'workers',
-        help='Number of workers for OpenStack Conductor service. The default will be the number of CPUs available.'),
+        help=('Number of workers for OpenStack Conductor service.'
+              'The default will be the number of CPUs available.')),
     cfg.IntOpt('conductor_life_check_timeout',
                default=4,
                help=('RPC timeout for the conductor liveness check that is '

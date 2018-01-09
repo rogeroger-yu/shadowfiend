@@ -14,15 +14,15 @@
 #    under the License.
 
 from pecan import rest
-from wsmeext.pecan import wsexpose
 
 from shadowfiend.api.controllers.v1 import account
-from shadowfiend.api.controllers.v1 import project
-from shadowfiend.api.controllers.v1 import relation
-from shadowfiend.api.controllers.v1 import charge
-from shadowfiend.api.controllers.v1 import order
-
+# from shadowfiend.api.controllers.v1 import charge
 from shadowfiend.api.controllers.v1 import models
+from shadowfiend.api.controllers.v1 import order
+from shadowfiend.api.controllers.v1 import project
+# from shadowfiend.api.controllers.v1 import relation
+
+from wsmeext.pecan import wsexpose
 
 
 class V1Controller(rest.RestController):

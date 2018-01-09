@@ -15,6 +15,7 @@
 
 import itertools
 
+
 class ShadowfiendException(Exception):
 
     message = "An unknown exception occurred."
@@ -57,8 +58,7 @@ class SSLError(ShadowfiendException):
 
 
 class PreChargeException(ShadowfiendException):
-    """PreCharge failed
-    """
+    """PreCharge failed"""
 
 
 class InvalidOutputFormat(ShadowfiendException):
@@ -227,8 +227,8 @@ class PreChargeNotFound(NotFound):
 
 
 class AccountCreateFailed(ShadowfiendException):
-    message = "Fail to create account %(user_id)s\
-                for the domain %(domain_id)s"
+    message = ("Fail to create account %(user_id)s "
+               "for the domain %(domain_id)s")
 
 
 class AccountGetFailed(ShadowfiendException):
@@ -248,8 +248,8 @@ class ProjectUpdateFailed(ShadowfiendException):
 
 
 class UserProjectNotFound(NotFound):
-    message = "Relationship between User %(user_id)s and\
-                Project %(project_id)s not found"
+    message = ("Relationship between User %(user_id)s and "
+               "Project %(project_id)s not found")
 
 
 class UserProjectUpdateFailed(ShadowfiendException):
@@ -257,18 +257,19 @@ class UserProjectUpdateFailed(ShadowfiendException):
 
 
 class ProjectCreateFailed(ShadowfiendException):
-    message ="Fail to create project %(project_id)s with project_owner %(user_id)s"
+    message = ("Fail to create project %(project_id)s "
+               "with project_owner %(user_id)s")
 
 
 class NotSufficientFund(ShadowfiendException):
     message = ("The balance of the billing owner %(user_id)s of "
-                "the project %(project_id)s is not sufficient")
+               "the project %(project_id)s is not sufficient")
     code = 402
 
 
 class NotSufficientFrozenBalance(ShadowfiendException):
     message = ("The frozen balance of the billing owner %(user_id)s of "
-                "the project %(project_id)s is not sufficient")
+               "the project %(project_id)s is not sufficient")
     code = 402
 
 
@@ -358,7 +359,7 @@ class InstanceNotFound(NotFound):
 
 class GlanceConnectionFailed(ShadowfiendException):
     message = ("Connection to glance host %(host)s:%(port)s failed: "
-                "%(reason)s")
+               "%(reason)s")
 
 
 class ImageNotAuthorized(NotAuthorized):
@@ -379,7 +380,7 @@ class CatalogFailure(ShadowfiendException):
 
 class CatalogNotFound(ShadowfiendException):
     message = ("Attr %(attr)s with value %(value)s not found in keystone "
-                "service catalog.")
+               "service catalog.")
 
 
 class HTTPException(ShadowfiendException):
@@ -400,8 +401,8 @@ class ConfigNotFound(ShadowfiendException):
 
 # Copy from keystoneclient.apiclient.exceptions
 class HTTPError(Exception):
-    """The base exception class for all HTTP exceptions.
-    """
+    """The base exception class for all HTTP exceptions."""
+
     http_status = 0
     message = "HTTP Error"
 

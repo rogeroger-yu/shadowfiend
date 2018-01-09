@@ -62,8 +62,8 @@ class ContextHook(hooks.PecanHook):
         roles = headers.get('X-Roles', '').split(',')
         auth_token_info = state.request.environ.get('keystone.token_info')
 
-        #is_admin = acl.context_is_admin(headers)
-        #is_domain_owner = acl.context_is_domain_owner(headers)
+        # is_admin = acl.context_is_admin(headers)
+        # is_domain_owner = acl.context_is_domain_owner(headers)
 
         auth_url = CONF.keystone_authtoken.auth_uri
 

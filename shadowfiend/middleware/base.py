@@ -1,10 +1,25 @@
-import copy
-import webob
-import uuid
+# -*- coding: utf-8 -*-
+# Copyright 2014 Objectif Libre
+#
+#    Licensed under the Apache License, Version 2.0 (the "License"); you may
+#    not use this file except in compliance with the License. You may obtain
+#    a copy of the License at
+#
+#         http://www.apache.org/licenses/LICENSE-2.0
+#
+#    Unless required by applicable law or agreed to in writing, software
+#    distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+#    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+#    License for the specific language governing permissions and limitations
+#    under the License.
 
+import copy
+import uuid
+import webob
+
+from decimal import Decimal
 from oslo_config import cfg
 from oslo_log import log
-from decimal import Decimal
 
 from shadowfiend.client.v1 import client
 from shadowfiend.common import constants as const
@@ -52,8 +67,8 @@ class SimpleResp(object):
 
 
 class BillingProtocol(object):
-    """Middleware that handles the billing owed logic
-    """
+    """Middleware that handles the billing owed logic"""
+
     def __init__(self, app, conf):
         self.app = app
         self.conf = conf
@@ -65,7 +80,6 @@ class BillingProtocol(object):
             msg = ('Could not get the verification information'
                    'for the reason: %s' % e)
             LOG.exception(msg)
-            return False, self._reject_request_500(env, start_response)
         else:
             identity_uri = identity_uri.rstrip('/')
 
@@ -101,6 +115,7 @@ class BillingProtocol(object):
 
         Reject request if the account is owed
         """
+
         request_method = env['REQUEST_METHOD']
         path_info = env['PATH_INFO']
         roles = env['HTTP_X_ROLES'].split(',')
@@ -444,9 +459,10 @@ class BillingProtocol(object):
         return True, result
 
     def _get_order_unit_price(self, env, body, method):
-        """Caculate unit price of this order
-        """
+        """Caculate unit price of this order"""
+
         unit_price = 0
+        return unit_price
         # for ext in self.product_items.extensions:
         #     if ext.name.startswith('running'):
         #         price = ext.obj.get_unit_price(env, body, method)
@@ -482,6 +498,7 @@ class BillingProtocol(object):
 
     def _unfreeze_balance(self, env, start_response, project_id, total_price):
         """Unfreeze the balance that was frozen before creating resource
+
         if failed to create the resource for some reason.
         """
         try:
@@ -669,6 +686,7 @@ class BillingProtocol(object):
 
     def _reject_request_402(self, env, start_response, min_balance):
         """For 402 condition:
+
         * if the minimum balance is 0, which is the most cases
         * if the minimum balance is 10, which is used for floatingip for now.
         """
@@ -742,80 +760,85 @@ class Resource(object):
         return copy.copy(self.__dict__)
 
 
-class ProductItem(object):
-
-    service = None
-
-    def __init__(self, sf_client):
-        self.sf_client = sf_client
-
-    def get_product_name(self, body):
-        raise NotImplementedError
-
-    def get_resource_volume(self, env, body):
-        return 1
-
-    def get_collection(self, env, body):
-        """Get collection from body
-        """
-        try:
-            user_id = env['HTTP_X_USER_ID']
-            project_id = env['HTTP_X_PROJECT_ID']
-        except KeyError:
-            user_id = env['HTTP_X_AUTH_USER_ID']
-            project_id = env['HTTP_X_AUTH_PROJECT_ID']
-        region_id = CONF.billing.region_name
-        return Collection(product_name=self.get_product_name(body),
-                          service=self.service,
-                          region_id=region_id,
-                          resource_volume=self.get_resource_volume(env, body),
-                          user_id=user_id,
-                          project_id=project_id)
-
-    def create_subscription(self, env, body, order_id, type=None):
-        """Subscribe to this product
-        """
-        collection = self.get_collection(env, body)
-        result = self.sf_client.create_subscription(order_id,
-                                                    type=type,
-                                                    **collection.as_dict())
-        return result
-
-    def get_unit_price(self, env, body, method):
-        """Get product unit price"""
-        collection = self.get_collection(env, body)
-        product = self.sf_client.get_product(collection.product_name,
-                                             collection.service,
-                                             collection.region_id)
-        if product:
-            if 'unit_price' in product:
-                unit_price = product['unit_price']
-                if not unit_price:
-                    price_data = None
-                if not method or method == 'hour':
-                    price_data = unit_price.get('price', None)
-                elif method == 'month':
-                    price_data = unit_price.get('monthly_price', None)
-                elif method == 'year':
-                    price_data = unit_price.get('yearly_price', None)
-            else:
-                price_data = None
-
-            def calculate_price(quantity, price_data=None):
-                if price_data and not isinstance(price_data, dict):
-                    raise exception.InvalidParameterValue(
-                        'price_data should be a dict')
-
-                if price_data and 'type' in price_data:
-                    base_price = quantize_decimal(
-                        price_data.get('base_price', 0))
-
-                    if (price_data['type'] == 'segmented') and (
-                            'segmented' in price_data):
-                        segmented_price = calculate_segmented_price(
-                            quantity, price_data['segmented'])
-
-                        return segmented_price + base_price
-            return calculate_price(collection.resource_volume, price_data)
-        else:
-            return 0
+# class ProductItem(object):
+#
+#     service = None
+#
+#     def __init__(self, sf_client):
+#         self.sf_client = sf_client
+#
+#     def get_product_name(self, body):
+#         raise NotImplementedError
+#
+#     def get_resource_volume(self, env, body):
+#         return 1
+#
+#     def get_collection(self, env, body):
+#         """Get collection from body
+#
+#         """
+#         try:
+#             user_id = env['HTTP_X_USER_ID']
+#             project_id = env['HTTP_X_PROJECT_ID']
+#         except KeyError:
+#             user_id = env['HTTP_X_AUTH_USER_ID']
+#             project_id = env['HTTP_X_AUTH_PROJECT_ID']
+#         region_id = CONF.billing.region_name
+#         return Collection(product_name=self.get_product_name(body),
+#                           service=self.service,
+#                           region_id=region_id,
+#                           resource_volume=self.get_resource_volume(env,
+#                                                                    body),
+#                           user_id=user_id,
+#                           project_id=project_id)
+#
+#     def create_subscription(self, env, body, order_id, type=None):
+#         """Subscribe to this product
+#
+#         """
+#
+#         collection = self.get_collection(env, body)
+#         result = self.sf_client.create_subscription(order_id,
+#                                                     type=type,
+#                                                     **collection.as_dict())
+#         return result
+#
+#     def get_unit_price(self, env, body, method):
+#         """Get product unit price"""
+#
+#         collection = self.get_collection(env, body)
+#         product = self.sf_client.get_product(collection.product_name,
+#                                              collection.service,
+#                                              collection.region_id)
+#         if product:
+#             if 'unit_price' in product:
+#                 unit_price = product['unit_price']
+#                 if not unit_price:
+#                     price_data = None
+#                 if not method or method == 'hour':
+#                     price_data = unit_price.get('price', None)
+#                 elif method == 'month':
+#                     price_data = unit_price.get('monthly_price', None)
+#                 elif method == 'year':
+#                     price_data = unit_price.get('yearly_price', None)
+#             else:
+#                 price_data = None
+#
+#             def calculate_price(quantity, price_data=None):
+#                 if price_data and not isinstance(price_data, dict):
+#                     raise exception.InvalidParameterValue(
+#                         'price_data should be a dict')
+#
+#                 if price_data and 'type' in price_data:
+#                     base_price = quantize_decimal(
+#                         price_data.get('base_price', 0))
+#
+#                     if (price_data['type'] == 'segmented') and (
+#                             'segmented' in price_data):
+#                         segmented_price = calculate_segmented_price(
+#                             quantity, price_data['segmented'])
+#
+#                         return segmented_price + base_price
+#             return calculate_price(collection.resource_volume, price_data)
+#         else:
+#             return 0

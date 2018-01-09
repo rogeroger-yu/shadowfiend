@@ -1,13 +1,20 @@
 {
     "sf_admin": "role:admin",
-    "account:post": "rule:sf_admin or role:user",
+    "owner": "user_id:%(user_id)s",
+
+    "account:post": "rule:sf_admin",
+    "account:delete": "rule:sf_admin",
+    "account:all": "rule:sf_admin",
+    "account:level": "rule:sf_admin",
+    "account:charge": "rule:sf_admin",
+    "account:get": "rule:sf_admin or rule:owner",
+
+    "project:all": "rule:sf_admin",
+    "project:post": "rule:sf_admin",
+
+    "charges:all": "rule:sf_admin",
+    "charges:get": "rule:sf_admin or rule:owner",
+
     "context_is_admin": "",
-    "context_is_domain_owner": "",
-    "account_get": "rule:sf_admin or role:user",
-    "account_delete": "rule:sf_admin or role:user",
-    "account:all": "rule:sf_admin or role:user",
-    "account:level": "rule:sf_admin or role:user",
-    "account:charge": "rule:sf_admin or role:user",
-    "charges:all": "rule:sf_admin or role:user",
-    "projects_get": "rule:sf_admin"
+    "context_is_domain_owner": ""
 }

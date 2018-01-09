@@ -22,7 +22,7 @@ class APIBase(wtypes.Base):
     def __init__(self, **kw):
         for key, value in kw.items():
             if isinstance(value, datetime.datetime):
-                #kw[k] = timeutils.isotime(at=value)
+                # kw[k] = timeutils.isotime(at=value)
                 kw[key] = value
         super(APIBase, self).__init__(**kw)
 
@@ -205,8 +205,8 @@ class Order(APIBase):
     renew_method = wtypes.text
     renew_period = int
 
+
 class Orders(APIBase):
     """Collection of orders."""
     total_count = int
     orders = [Order]
-

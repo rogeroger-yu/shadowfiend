@@ -15,20 +15,19 @@
 
 import sys
 
-from oslo_config import cfg
 from oslo_concurrency import processutils
+from oslo_config import cfg
 from oslo_log import log
 from oslo_reports import guru_meditation_report as gmr
 
-from shadowfiend.common import config
 from shadowfiend.common import service as oslo_service
 from shadowfiend.common import version
 
-from shadowfiend.processor.service import service
 from shadowfiend.processor.handlers import account_api
+from shadowfiend.processor.handlers import charge_api
 from shadowfiend.processor.handlers import project_api
 from shadowfiend.processor.handlers import usr_prj_api
-from shadowfiend.processor.handlers import charge_api
+from shadowfiend.processor.service import service
 
 
 LOG = log.getLogger(__name__)

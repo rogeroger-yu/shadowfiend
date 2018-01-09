@@ -1,13 +1,24 @@
-import pecan
+# -*- coding: utf-8 -*-
+# Copyright 2017 Openstack Foundation.
+#
+#    Licensed under the Apache License, Version 2.0 (the "License"); you may
+#    not use this file except in compliance with the License. You may obtain
+#    a copy of the License at
+#
+#         http://www.apache.org/licenses/LICENSE-2.0
+#
+#    Unless required by applicable law or agreed to in writing, software
+#    distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+#    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+#    License for the specific language governing permissions and limitations
+#    under the License.
+
 import datetime
 import itertools
+import pecan
 
-from pecan import rest
-from wsmeext.pecan import wsexpose
-from wsme import types as wtypes
-
-from oslo_config import cfg
 from oslo_log import log
+from pecan import rest
 
 from shadowfiend.api import acl
 from shadowfiend.api.controllers.v1 import models
@@ -16,6 +27,8 @@ from shadowfiend.common import timeutils
 from shadowfiend.db import models as db_models
 from shadowfiend.services import keystone as ks_client
 
+from wsme import types as wtypes
+from wsmeext.pecan import wsexpose
 
 LOG = log.getLogger(__name__)
 HOOK = pecan.request
@@ -34,15 +47,17 @@ class BillingOwnerController(rest.RestController):
     @wsexpose(None, wtypes.text)
     def put(self, user_id):
         """Change billing_owner of this project."""
-        HOOK.conductor_rpcapi.change_billing_owner(HOOK.context,
-                                                   project_id=self.project_id,
-                                                   user_id=user_id)
+        HOOK.conductor_rpcapi.change_billing_owner(
+            HOOK.context,
+            project_id=self.project_id,
+            user_id=user_id)
 
     @wsexpose(models.UserAccount)
     def get(self):
         LOG.info("get_billing_owner")
-        user_account = HOOK.conductor_rpcapi.get_billing_owner(HOOK.context,
-                                                               self.project_id)
+        user_account = HOOK.conductor_rpcapi.get_billing_owner(
+            HOOK.context,
+            self.project_id)
         return db_models.Account(**user_account)
 
     @wsexpose(models.BalanceFrozenResult, body=models.BalanceFrozenBody)
@@ -72,9 +87,10 @@ class ExistProjectController(rest.RestController):
 
     def _project(self):
         try:
-            project = HOOK.conductor_rpcapi.get_project(HOOK.context,
-                                                        project_id=self._id)
-        except Exception as e:
+            project = HOOK.conductor_rpcapi.get_project(
+                HOOK.context,
+                project_id=self._id)
+        except Exception:
             LOG.error('project %s no found' % self._id)
             raise exception.ProjectNotFound(project_id=self._id)
         return project
@@ -106,7 +122,7 @@ class ProjectController(rest.RestController):
     def get_all(self, user_id=None, type=None, duration=None):
         """Get all projects."""
         user_id = acl.get_limited_to_user(HOOK.headers,
-                                          'projects_get') or user_id
+                                          'project:all') or user_id
         result = []
 
         if not type or type.lower() == 'pay':
@@ -181,7 +197,7 @@ class ProjectController(rest.RestController):
                     result.append(up)
 
         elif type.lower() == 'simple':
-            duration = gringutils.normalize_timedelta(duration)
+            duration = timeutils.normalize_timedelta(duration)
             if duration:
                 active_from = datetime.datetime.utcnow() - duration
             else:
@@ -220,6 +236,7 @@ class ProjectController(rest.RestController):
     @wsexpose(None, body=models.Project)
     def post(self, data):
         """Create a new project."""
+        policy.check_policy(HOOK.context, "project:post")
         try:
             project = data.as_dict()
             return HOOK.conductor_rpcapi.create_project(HOOK.context, project)

@@ -25,7 +25,8 @@ sql_opts = [
                help='MySQL engine to use.')
 ]
 
-_DEFAULT_SQL_CONNECTION = 'sqlite:///' + paths.state_path_def('shadowfiend.sqlite')
+_DEFAULT_SQL_CONNECTION = ('sqlite:///' +
+                           paths.state_path_def('shadowfiend.sqlite'))
 
 
 cfg.CONF.register_opts(sql_opts, 'database')

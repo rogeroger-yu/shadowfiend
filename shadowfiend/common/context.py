@@ -13,9 +13,13 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+import itertools
+
 from eventlet.green import threading
 from oslo_config import cfg
 from oslo_context import context
+
+from shadowfiend.common import exception
 
 CONF = cfg.CONF
 
@@ -38,8 +42,8 @@ class RequestContext(context.RequestContext):
                                authenticate a user against.
         :param user_domain_name: The name of the domain to
                                  authenticate a user against.
-
         """
+
         super(RequestContext, self).__init__(auth_token=auth_token,
                                              user=user_name,
                                              tenant=project_name,
@@ -94,6 +98,7 @@ class RequestContext(context.RequestContext):
 def make_context(*args, **kwargs):
     return RequestContext(*args, **kwargs)
 
+
 def make_admin_context(show_deleted=False, all_tenants=False):
     """Create an administrator context.
 
@@ -109,6 +114,7 @@ def make_admin_context(show_deleted=False, all_tenants=False):
 
 _CTX_STORE = threading.local()
 _CTX_KEY = 'current_ctx'
+
 
 def has_ctx():
     return hasattr(_CTX_STORE, _CTX_KEY)
@@ -129,6 +135,9 @@ def set_ctx(new_ctx):
         setattr(context._request_store, 'context', new_ctx)
 
 
+admin_context = None
+
+
 def get_admin_context():
     global admin_context
     if not admin_context:
@@ -139,10 +148,9 @@ def get_admin_context():
 def get_context_from_function_and_args(function, args, kwargs):
     """Find an arg of type RequestContext and return it.
 
-       This is useful in a couple of decorators where we don't
-       know much about the function we're wrapping.
+    This is useful in a couple of decorators where we don't
+    know much about the function we're wrapping.
     """
-
     for arg in itertools.chain(kwargs.values(), args):
         if isinstance(arg, RequestContext):
             return arg
@@ -151,8 +159,10 @@ def get_context_from_function_and_args(function, args, kwargs):
 
 
 def is_user_context(context):
-    """Indicates if the request context is a normal user who doesn't bind
-    to any project or domain owner"""
+    """Indicates if the request context is a normal user who
+
+    doesn't bind to any project or domain owner
+    """
     if context.is_admin:
         return False
     if context.is_domain_owner:
@@ -164,6 +174,7 @@ def is_user_context(context):
 
 def is_domain_owner_context(context):
     """Indicates that the context is only a domain owner"""
+
     if context.is_admin:
         return False
     if context.is_domain_owner:

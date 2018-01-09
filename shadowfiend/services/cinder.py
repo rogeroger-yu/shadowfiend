@@ -17,10 +17,12 @@ from oslo_config import cfg
 from oslo_log import log
 
 from cinderclient import client as cinder_client
+from cinderclient.exceptions import NotFound
+from shadowfiend.common import constants as const
+from shadowfiend.common import timeutils
+from shadowfiend.common import utils
 from shadowfiend.services import BaseClient
 from shadowfiend.services import Resource
-from shadowfiend.common import constants as const
-from shadowfiend.common import utils
 
 
 LOG = log.getLogger(__name__)
@@ -38,7 +40,7 @@ class CinderClient(BaseClient):
             session=self.session,
             auth_url=self.auth.auth_url)
 
-    def volume_get(volume_id, region_name=None):
+    def volume_get(self, volume_id, region_name=None):
         try:
             volume = self.cinder_client.volumes.get(volume_id)
         except NotFound:
@@ -52,7 +54,7 @@ class CinderClient(BaseClient):
                       attachments=volume.attachments,
                       size=volume.size)
 
-    def snapshot_get(snapshot_id, region_name=None):
+    def snapshot_get(self, snapshot_id, region_name=None):
         try:
             sp = self.cinder_client.volume_snapshots.get(snapshot_id)
         except NotFound:
@@ -82,7 +84,8 @@ class Snapshot(Resource):
         return msg
 
     def to_env(self):
-        return dict(HTTP_X_USER_ID=self.user_id, HTTP_X_PROJECT_ID=self.project_id)
+        return dict(HTTP_X_USER_ID=self.user_id,
+                    HTTP_X_PROJECT_ID=self.project_id)
 
     def to_body(self):
         body = {}
@@ -107,10 +110,10 @@ class Volume(Resource):
         return msg
 
     def to_env(self):
-        """
-        :returns: TODO
-        """
-        return dict(HTTP_X_USER_ID=self.user_id, HTTP_X_PROJECT_ID=self.project_id)
+        """:returns: TODO"""
+
+        return dict(HTTP_X_USER_ID=self.user_id,
+                    HTTP_X_PROJECT_ID=self.project_id)
 
     def to_body(self):
         body = {}

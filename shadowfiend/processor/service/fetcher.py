@@ -14,7 +14,6 @@
 #    under the License.
 
 from dateutil import parser
-import requests
 import six
 
 from oslo_config import cfg
@@ -26,12 +25,12 @@ from keystoneclient import exceptions
 from gnocchiclient import exceptions as gexceptions
 
 from shadowfiend.common import timeutils
-from shadowfiend.services.keystone import KeystoneClient 
 from shadowfiend.services.gnocchi import GnocchiClient
+from shadowfiend.services.keystone import KeystoneClient
 # services test fetcher
-#from shadowfiend.services.cinder import CinderClient
-#from shadowfiend.services.nova import NovaClient
-#from shadowfiend.services.glance import GlanceClient
+# from shadowfiend.services.cinder import CinderClient
+# from shadowfiend.services.nova import NovaClient
+# from shadowfiend.services.glance import GlanceClient
 from shadowfiend.services.neutron import NeutronClient
 
 
@@ -56,7 +55,7 @@ class KeystoneFetcher(KeystoneClient):
         raise exceptions.VersionNotAvailable(msg)
 
     def _do_get_tenants(self, auth_version_mapping):
-        #tenant_attr: project,tenant_attrs: projects,role_func: list
+        # tenant_attr: project,tenant_attrs: projects,role_func: list
         tenant_attr, tenants_attr, role_func = auth_version_mapping
         tenant_list = getattr(self.ks_client, tenants_attr).list()
         user_list = getattr(self.ks_client.users, 'list')(
@@ -81,7 +80,7 @@ class GnocchiFetcher(GnocchiClient):
     def __init__(self):
         super(GnocchiFetcher, self).__init__()
 
-    def get_state(self, tenant_id): 
+    def get_state(self, tenant_id):
         query = {"=": {"project_id": tenant_id}}
         resources = self.gnocchi_client.resource.search(
             resource_type='cloudkitty_state',
@@ -114,35 +113,36 @@ class GnocchiFetcher(GnocchiClient):
                 return timeutils.dt2ts(parser.parse(r[-1][0]))
 
 
-#class TenantBillFetcher(Fetcher):
-#    def __init__():
-#        pass
+# class TenantBillFetcher(Fetcher):
+#     def __init__():
+#         pass
 
-# service test fetcher
-#class CinderFetcher(CinderClient):
-#    def __init__(self):
-#        super(CinderFetcher, self).__init__()
+#  service test fetcher
+# class CinderFetcher(CinderClient):
+#     def __init__(self):
+#         super(CinderFetcher, self).__init__()
 #
-#    def get_volumes(self, volume_id):
-#        return self.cinder_client.volumes.get(volume_id)
+#     def get_volumes(self, volume_id):
+#         return self.cinder_client.volumes.get(volume_id)
 
-#class NovaFetcher(NovaClient):
-#    def __init__(self):
-#        super(NovaFetcher, self).__init__()
+# class NovaFetcher(NovaClient):
+#     def __init__(self):
+#         super(NovaFetcher, self).__init__()
 #
-#    def flavor_list(self):
-#        return self.nova_client.flavors.list()
+#     def flavor_list(self):
+#         return self.nova_client.flavors.list()
 
-#class GlanceFetcher(GlanceClient):
-#    def __init__(self):
-#        super(GlanceFetcher, self).__init__()
+# class GlanceFetcher(GlanceClient):
+#     def __init__(self):
+#         super(GlanceFetcher, self).__init__()
 #
-#    def image_list(self):
-#        return self.image_get(image_id='eb54e9f2-fb74-47f7-81f8-e6e449cc3a91')
+#     def image_list(self):
+#         return self.image_get(
+#             image_id='eb54e9f2-fb74-47f7-81f8-e6e449cc3a91')
 
 class NeutronFetcher(NeutronClient):
     def __init__(self):
         super(NeutronFetcher, self).__init__()
 
-    def networks_list(self, project_id): 
-        return  self.network_list(project_id)
+    def networks_list(self, project_id):
+        return self.network_list(project_id)

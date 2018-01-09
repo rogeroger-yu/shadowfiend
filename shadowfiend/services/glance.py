@@ -1,13 +1,27 @@
-import functools
+# -*- coding: utf-8 -*-
+# Copyright 2014 Objectif Libre
+#
+#    Licensed under the Apache License, Version 2.0 (the "License"); you may
+#    not use this file except in compliance with the License. You may obtain
+#    a copy of the License at
+#
+#         http://www.apache.org/licenses/LICENSE-2.0
+#
+#    Unless required by applicable law or agreed to in writing, software
+#    distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+#    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+#    License for the specific language governing permissions and limitations
+#    under the License.
+
 import logging as log
 
 from glanceclient import client as glance_client
-from glanceclient.exc import NotFound,HTTPNotFound
+from glanceclient.exc import HTTPNotFound
+from glanceclient.exc import NotFound
 
-from shadowfiend.common import utils
-from shadowfiend.common import timeutils
 from shadowfiend.common import constants as const
-from shadowfiend.services import keystone as ks_client
+from shadowfiend.common import timeutils
+from shadowfiend.common import utils
 from shadowfiend.services import BaseClient
 from shadowfiend.services import Resource
 
@@ -39,7 +53,7 @@ class GlanceClient(BaseClient):
                      original_status=image.status,
                      resource_type=const.RESOURCE_IMAGE,
                      size=image.size)
- 
+
     def image_list(self, project_id, region_name=None, project_name=None):
         filters = {'owner': project_id}
         images = self.glance_client.images.list(filters=filters)
@@ -47,30 +61,31 @@ class GlanceClient(BaseClient):
         for image in images:
             created_at = utils.format_datetime(image.created_at)
             status = utils.transform_status(image.status)
-            formatted_images.append(Image(id=image.id,
-                                          name=getattr(image, 'name', None),
-                                          size=getattr(image, 'size', 0),
-                                          status=status,
-                                          original_status=image.status,
-                                          resource_type=const.RESOURCE_IMAGE,
-                                          project_id=project_id,
-                                          project_name=project_name,
-                                          created_at=created_at))
+            formatted_images.append(
+                Image(id=image.id,
+                      name=getattr(image, 'name', None),
+                      size=getattr(image, 'size', 0),
+                      status=status,
+                      original_status=image.status,
+                      resource_type=const.RESOURCE_IMAGE,
+                      project_id=project_id,
+                      project_name=project_name,
+                      created_at=created_at))
         return formatted_images
- 
+
     def delete_images(self, project_id, region_name=None):
         filters = {'owner': project_id}
         images = self.glance_client.images.list(filters=filters)
         for image in images:
             self.glance_client.images.delete(image.id)
             LOG.warn("Delete image: %s" % image.id)
- 
+
     def delete_image(self, image_id, region_name=None):
         self.glance_client.images.delete(image_id)
- 
+
     def stop_image(self, image_id, region_name):
         return True
- 
+
 
 class Image(Resource):
     def to_message(self):

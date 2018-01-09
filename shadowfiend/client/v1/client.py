@@ -16,7 +16,6 @@
 import logging
 
 from shadowfiend.client import client
-from shadowfiend.common import exception
 
 
 LOG = logging.getLogger(__name__)
@@ -53,8 +52,8 @@ class Client(object):
 
     def get_projects(self, user_id=None, type=None, duration=None):
         _body = dict(user_id=user_id,
-                      type=type,
-                      duration=duration)
+                     type=type,
+                     duration=duration)
         resp, body = self.client.get('/projects', body=_body)
         return body
 
@@ -64,9 +63,9 @@ class Client(object):
 
     def get_accounts(self, owed=None, limit=None, offset=None, duration=None):
         _body = dict(owed=owed,
-                      limit=limit,
-                      offset=offset,
-                      duration=duration)
+                     limit=limit,
+                     offset=offset,
+                     duration=duration)
         resp, body = self.client.get('/accounts', body=_body)
         return body
 
@@ -137,13 +136,8 @@ class Client(object):
                      cron_time=cron_time,
                      change_order_status=change_order_status,
                      first_change_to=first_change_to)
-        try:
-            self.client.put('/orders', body=_body)
-            return True, None
-        except Exception:
-            msg = "Unable to update the order: %s" % order_id
-            LOG.exception(msg)
-            return False, self._reject_request_500(env, start_response)
+        self.client.put('/orders', body=_body)
+        return True, None
 
     def close_order(self, order_id):
         self.client.put('/orders/%s/close' % order_id)

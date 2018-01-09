@@ -1,16 +1,30 @@
+# -*- coding: utf-8 -*-
+# Copyright 2014 Objectif Libre
+#
+#    Licensed under the Apache License, Version 2.0 (the "License"); you may
+#    not use this file except in compliance with the License. You may obtain
+#    a copy of the License at
+#
+#         http://www.apache.org/licenses/LICENSE-2.0
+#
+#    Unless required by applicable law or agreed to in writing, software
+#    distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+#    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+#    License for the specific language governing permissions and limitations
+#    under the License.
+
 from __future__ import absolute_import
 
 import copy
 import json
-import re
-
-import webob
 import logging
-from oslo_config import cfg
+import re
+import webob
 
-from shadowfiend.client.noauth import client
 from keystone.common import dependency
 from keystone.common import driver_hints
+from oslo_config import cfg
+from shadowfiend.client.noauth import client
 
 LOG = logging.getLogger(__name__)
 cfg.CONF.import_group("billing", "shadowfiend.middleware.base")
@@ -35,9 +49,10 @@ KEYSTONE_OPTS = [
                default=None,
                help="Billing admin user domain name"),
 ]
-cfg.CONF.register_opts(KEYSTONE_OPTS,group="billing")
+cfg.CONF.register_opts(KEYSTONE_OPTS, group="billing")
 
-UUID_RE = r"([0-9a-f]{32}|[0-9a-f]{64}|[0-9a-z]{8}-[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{12})"
+UUID_RE = (r"([0-9a-f]{32}|[0-9a-f]{64}|[0-9a-z]{8}-"
+           "[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{12})")
 API_VERSION = r"(v2.0|v3)"
 USER_RESOURCE_RE = r"(users)"
 PROJECT_RESOURCE_RE = r"(projects|tenants)"
@@ -67,6 +82,7 @@ class User(object):
     def as_dict(self):
         return copy.copy(self.__dict__)
 
+
 class Project(object):
 
     def __init__(self, project_id, project_name, domain_id):
@@ -89,27 +105,24 @@ class KeystoneBillingProtocol(object):
         self.role_id_position = 5
 
         self.user_regex = re.compile(
-            r"^/%s/%s([.][^.]+)?$" % \
-                (USER_RESOURCE_RE, UUID_RE),
+            r"^/%s/%s([.][^.]+)?$" % (USER_RESOURCE_RE, UUID_RE),
             re.UNICODE)
         self.create_user_regex = re.compile(
             r"^/%s([.][^.]+)?$" % (USER_RESOURCE_RE),
             re.UNICODE)
         self.project_regex = re.compile(
-            r"^/%s/%s([.][^.]+)?$" % \
-                (PROJECT_RESOURCE_RE, UUID_RE),
+            r"^/%s/%s([.][^.]+)?$" % (PROJECT_RESOURCE_RE, UUID_RE),
             re.UNICODE)
         self.create_project_regex = re.compile(
             r"^/%s([.][^.]+)?$" % (PROJECT_RESOURCE_RE),
             re.UNICODE)
         self.role_regex = re.compile(
-            r"^/%s/%s/%s/%s/%s/%s([.][^.]+)?$" % \
-                (PROJECT_RESOURCE_RE, UUID_RE, USER_RESOURCE_RE,
-                 UUID_RE, ROLE_RESOURCE_RE, UUID_RE),
+            r"^/%s/%s/%s/%s/%s/%s([.][^.]+)?$" %
+            (PROJECT_RESOURCE_RE, UUID_RE, USER_RESOURCE_RE,
+             UUID_RE, ROLE_RESOURCE_RE, UUID_RE),
             re.UNICODE)
 
-        noauth_billing_endpoint = cfg.CONF.billing.billing_endpoint + \
-            '/noauth'
+        noauth_billing_endpoint = cfg.CONF.billing.billing_endpoint + '/noauth'
         self.sf_client = client.Client(endpoint=noauth_billing_endpoint)
 
     def create_user_action(self, method, path_info):
@@ -159,11 +172,11 @@ class KeystoneBillingProtocol(object):
         projects = []
         try:
             for r in result:
-               project = json.loads(r)['project']
-               projects.append(Project(
-                   project_id=project['id'],
-                   project_name=project['name'],
-                   domain_id=project['domain_id']))
+                project = json.loads(r)['project']
+                projects.append(Project(
+                    project_id=project['id'],
+                    project_name=project['name'],
+                    domain_id=project['domain_id']))
         except Exception:
             return []
         return projects
@@ -184,19 +197,16 @@ class KeystoneBillingProtocol(object):
         user_name = cfg.CONF.billing.billing_admin_user_name
         if not user_name:
             return None
-        domain_name = \
-            cfg.CONF.billing.billing_admin_user_domain_name
+        domain_name = cfg.CONF.billing.billing_admin_user_domain_name
         try:
-            domain = \
-                self.resource_api.get_domain_by_name(domain_name)
+            domain = self.resource_api.get_domain_by_name(domain_name)
             domain_id = domain['id']
         except Exception as e:
             LOG.warn(e)
             return None
 
         try:
-            user = \
-                self.identity_api.get_user_by_name(user_name, domain_id)
+            user = self.identity_api.get_user_by_name(user_name, domain_id)
         except Exception as e:
             LOG.warn(e)
             return None
@@ -221,8 +231,8 @@ class KeystoneBillingProtocol(object):
         request_method = env['REQUEST_METHOD']
         path_info = env.get('PATH_INFO')
 
-        if not cfg.CONF.billing.enable_billing or \
-                request_method in set(['GET', 'OPTIONS', 'HEAD']):
+        if ((not cfg.CONF.billing.enable_billing) or
+                (request_method in set(['GET', 'OPTIONS', 'HEAD']))):
             return self.app(env, start_response)
 
         try:
@@ -261,7 +271,6 @@ class KeystoneBillingProtocol(object):
         # the billing owner role to the previous billing owner on the
         # project.
         elif self.add_role_action(request_method, path_info):
-            LOG.warning("---------------add role-------------")
             user_id, project_id, role_id = self.get_role_action_ids(path_info)
             app_result = self.app(env, start_response)
 
@@ -275,8 +284,7 @@ class KeystoneBillingProtocol(object):
                     app_result = result
             return app_result
         elif self.unassign_role_action(request_method, path_info):
-            user_id, project_id, role_id = \
-                self.get_role_action_ids(path_info)
+            user_id, project_id, role_id = self.get_role_action_ids(path_info)
 
             if not self._is_billing_owner_role(role_id):
                 return self.app(env, start_response)

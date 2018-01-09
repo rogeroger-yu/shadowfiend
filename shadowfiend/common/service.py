@@ -15,22 +15,18 @@
 
 import eventlet
 import os
-import random
+import oslo_i18n
+import oslo_messaging as messaging
 import socket
 import sys
 
-import oslo_i18n
-import oslo_messaging as messaging
-
 from oslo_config import cfg
-from oslo_messaging.rpc import dispatcher
 from oslo_log import log
 from oslo_service import service
 
 from shadowfiend.common import config
 from shadowfiend.common import rpc
 from shadowfiend.objects import base as objects_base
-from shadowfiend.common import version
 
 eventlet.monkey_patch()
 
@@ -100,35 +96,32 @@ class Service(service.Service):
         self.periodic_fuzzy_delay = periodic_fuzzy_delay
         self.periodic_interval_max = periodic_interval_max
 
-
     def start(self):
-        #access_policy = dispatcher.DefaultRPCAccessPolicy
+        # access_policy = dispatcher.DefaultRPCAccessPolicy
         serializer = rpc.RequestContextSerializer(
             objects_base.ShadowfiendObjectSerializer())
         transport = messaging.get_transport(cfg.CONF,
                                             aliases=TRANSPORT_ALIASES)
         target = messaging.Target(topic=self.topic, server=self.host)
-        self._server = messaging.get_rpc_server(transport, 
-                                                target, 
+        self._server = messaging.get_rpc_server(transport,
+                                                target,
                                                 self.manager,
                                                 serializer=serializer,
                                                 executor='eventlet')
 
-
         self._server.start()
         LOG.debug("Creating RPC server for service %s", self.topic)
 
+        # if self.periodic_enable:
+        #     if self.periodic_fuzzy_delay:
+        #         initial_delay = random.randint(0, self.periodic_fuzzy_delay)
+        #     else:
+        #         initial_delay = None
 
-        #if self.periodic_enable:
-        #    if self.periodic_fuzzy_delay:
-        #        initial_delay = random.randint(0, self.periodic_fuzzy_delay)
-        #    else:
-        #        initial_delay = None
-
-        #    self.tg.add_dynamic_timer(self.periodic_tasks,
-        #                              initial_delay=initial_delay,
-        #                              periodic_interval_max=
-        #                              self.periodic_interval_max)
+        #     self.tg.add_dynamic_timer(self.periodic_tasks,
+        #                               initial_delay=initial_delay,
+        #                               periodic_interval_max=
+        #                               self.periodic_interval_max)
 
     def stop(self):
         if self._server:
@@ -165,7 +158,9 @@ class Service(service.Service):
 
         return service_obj
 
+
 _launcher = None
+
 
 def serve(server, workers=None):
     global _launcher

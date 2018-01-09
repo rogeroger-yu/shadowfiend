@@ -1,9 +1,22 @@
+# -*- coding: utf-8 -*-
+# Copyright 2014 Objectif Libre
+#
+#    Licensed under the Apache License, Version 2.0 (the "License"); you may
+#    not use this file except in compliance with the License. You may obtain
+#    a copy of the License at
+#
+#         http://www.apache.org/licenses/LICENSE-2.0
+#
+#    Unless required by applicable law or agreed to in writing, software
+#    distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+#    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+#    License for the specific language governing permissions and limitations
+#    under the License.
+
 """initial migration
-
 Revision ID: 6d356e9164d3
-Revises: 
+Revises:
 Create Date: 2017-10-24 17:31:54.544759
-
 """
 
 # revision identifiers, used by Alembic.
@@ -20,8 +33,8 @@ def upgrade():
         sa.Column('id', sa.Integer, primary_key=True),
         sa.Column('user_id', sa.String(255), index=True, unique=True),
         sa.Column('domain_id', sa.String(255)),
-        sa.Column('balance', sa.DECIMAL(20,4)),
-        sa.Column('consumption', sa.DECIMAL(20,4)),
+        sa.Column('balance', sa.DECIMAL(20, 4)),
+        sa.Column('consumption', sa.DECIMAL(20, 4)),
         sa.Column('level', sa.Integer),
         sa.Column('owed', sa.Boolean),
         sa.Column('deleted', sa.Boolean),
@@ -39,7 +52,7 @@ def upgrade():
         sa.Column('id', sa.Integer, primary_key=True),
         sa.Column('user_id', sa.String(255), index=True),
         sa.Column('project_id', sa.String(255), index=True, unique=True),
-        sa.Column('consumption', sa.DECIMAL(20,4)),
+        sa.Column('consumption', sa.DECIMAL(20, 4)),
 
         sa.Column('domain_id', sa.String(255)),
 
@@ -55,7 +68,7 @@ def upgrade():
         sa.Column('id', sa.Integer, primary_key=True),
         sa.Column('user_id', sa.String(255), index=True),
         sa.Column('project_id', sa.String(255), index=True),
-        sa.Column('consumption', sa.DECIMAL(20,4)),
+        sa.Column('consumption', sa.DECIMAL(20, 4)),
 
         sa.Column('domain_id', sa.String(255)),
 
@@ -66,7 +79,9 @@ def upgrade():
         mysql_charset='UTF8'
     )
 
-    op.create_unique_constraint('uq_usr_prj_relation_id', 'usr_prj_relation', ['user_id', 'project_id'])
+    op.create_unique_constraint('uq_usr_prj_relation_id',
+                                'usr_prj_relation',
+                                ['user_id', 'project_id'])
 
     op.create_table(
         'charge',
@@ -74,7 +89,7 @@ def upgrade():
         sa.Column('charge_id', sa.String(255)),
         sa.Column('user_id', sa.String(255)),
         sa.Column('domain_id', sa.String(255)),
-        sa.Column('value', sa.DECIMAL(20,4)),
+        sa.Column('value', sa.DECIMAL(20, 4)),
         sa.Column('type', sa.String(64)),
         sa.Column('come_from', sa.String(255)),
         sa.Column('charge_time', sa.DateTime),
@@ -101,9 +116,9 @@ def upgrade():
         sa.Column('type', sa.String(255)),
         sa.Column('status', sa.String(64)),
 
-        sa.Column('unit_price', sa.DECIMAL(20,4)),
+        sa.Column('unit_price', sa.DECIMAL(20, 4)),
         sa.Column('unit', sa.String(64)),
-        sa.Column('total_price', sa.DECIMAL(20,4)),
+        sa.Column('total_price', sa.DECIMAL(20, 4)),
         sa.Column('cron_time', sa.DateTime),
         sa.Column('date_time', sa.DateTime),
 
@@ -125,6 +140,9 @@ def upgrade():
         mysql_engine='InnoDB',
         mysql_charset='utf8',
     )
-    op.create_index('ix_order_user_id_project_id', 'order', ['user_id', 'project_id'])
-    op.create_unique_constraint('uq_order_resource_id', 'order', ['order_id', 'resource_id'])
-
+    op.create_index('ix_order_user_id_project_id',
+                    'order',
+                    ['user_id', 'project_id'])
+    op.create_unique_constraint('uq_order_resource_id',
+                                'order',
+                                ['order_id', 'resource_id'])

@@ -23,7 +23,6 @@ import pecan
 
 from shadowfiend.api import config as api_config
 from shadowfiend.api import hooks
-from shadowfiend.common import config as common_config
 from shadowfiend.common.i18n import _LI
 
 
@@ -31,7 +30,7 @@ LOG = log.getLogger(__name__)
 
 auth_opts = [
     cfg.StrOpt('api_paste_config',
-               default="/home/heat-admin/shadowfiend/etc/shadowfiend/api_paste.ini",
+               default=("/etc/shadowfiend/api_paste.ini"),
                help="Configuration file for WSGI definition of API."
                ),
     cfg.StrOpt('auth_strategy',
@@ -67,7 +66,6 @@ def setup_app(config=None):
 
     app_hooks = [hooks.ContextHook(),
                  hooks.RPCHook()]
-
 
     if not config:
         config = get_pecan_config()
@@ -146,6 +144,7 @@ def build_server():
 
 def app_factory(global_config, **local_conf):
     return setup_app()
+
 
 def noauth_app_factory(global_config, **local_conf):
     return setup_noauth_app()

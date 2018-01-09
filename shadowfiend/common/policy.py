@@ -15,8 +15,6 @@
 
 # Borrowed from cinder (cinder/policy.py)
 
-import six
-
 from oslo_config import cfg
 from oslo_policy import policy
 
@@ -52,6 +50,7 @@ def enforce(context, rule=None, target=None, exc=None, *args, **kwargs):
 
     """
     enforcer = init()
+
     credentials = context.to_dict()
     if not exc:
         exc = exception.PolicyNotAuthorized

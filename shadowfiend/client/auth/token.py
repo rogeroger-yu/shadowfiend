@@ -64,10 +64,10 @@ class TokenAuthPlugin(BaseAuthPlugin):
                  auth_url=None,
                  **kwargs):
         """Support two kinds of token auth method:
+
         1. username/password, this will request keystone for token
         2. token/endpoint, this will use existing token and endpoint,
            there is no need to authenticate again.
-
         """
         self._management_url = None
         self._auth_token = None
@@ -163,10 +163,10 @@ class TokenAuthPlugin(BaseAuthPlugin):
 
         self._expires_at = timeutils.iso2dt(resp_data['expires_at'])
         self.auth_token = resp.headers['X-Subject-Token']
-        self._management_url = self._get_endpoint(resp_data['catalog'],
-                                                  version=self.version,
-                                                  service_type=
-                                                  self.service_type)
+        self._management_url = self._get_endpoint(
+            resp_data['catalog'],
+            version=self.version,
+            service_type=self.service_type)
         return True
 
     def _get_endpoint(self, catalog, version=None, service_type=None):

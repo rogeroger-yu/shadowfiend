@@ -1,12 +1,25 @@
+# -*- coding: utf-8 -*-
+# Copyright 2014 Objectif Libre
+#
+#    Licensed under the Apache License, Version 2.0 (the "License"); you may
+#    not use this file except in compliance with the License. You may obtain
+#    a copy of the License at
+#
+#         http://www.apache.org/licenses/LICENSE-2.0
+#
+#    Unless required by applicable law or agreed to in writing, software
+#    distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+#    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+#    License for the specific language governing permissions and limitations
+#    under the License.
+
 """Model classes for use in the storage API.
 This model is the abstraction layer across all DB backends.
 """
 
 
 class Model(object):
-    """Base class for storage API models.
-    """
-
+    """Base class for storage API models."""
     def __init__(self, **kwds):
         self.fields = list(kwds)
         for k, v in kwds.iteritems():
@@ -34,8 +47,7 @@ class Model(object):
 
 
 class Product(Model):
-    """The DB Model for Product, which should has the same fields
-    with API models.
+    """The DB Model, which should has the same fields with API models.
 
     :param product_id: UUID of the product
     :param name: The name of the product
@@ -115,16 +127,16 @@ class Order(Model):
 
 class Account(Model):
     """The DB model of user
+
     :param user_id: The uuid of the user
     :param balance: The balance of the user
     :param consumption: The consumption of the
     :param currency: The currency of the user
     """
-
     def __init__(self,
                  user_id, domain_id, balance, consumption,
-                 level, deleted=None, owed=None, created_at=None, updated_at=None,
-                 deleted_at=None, *args, **kwargs):
+                 level, deleted=None, owed=None, created_at=None,
+                 updated_at=None, deleted_at=None, *args, **kwargs):
         Model.__init__(
             self,
             user_id=user_id,
@@ -141,12 +153,12 @@ class Account(Model):
 
 class Charge(Model):
     """The charge record db model
+
     :param charge_id: The uuid of the charge
     :param user_id: The uuid of the user
     :param value: The charge value one time
     :param charge_time: The charge time
     """
-
     def __init__(self, charge_id, user_id, domain_id,
                  value, charge_time,
                  type=None, come_from=None, trading_number=None,
@@ -183,7 +195,8 @@ class Project(Model):
 
 class UsrPrjRelation(Model):
     def __init__(self, user_id, project_id, user_consumption,
-                 project_consumption, is_historical, created_at, *args, **kwargs):
+                 project_consumption, is_historical,
+                 created_at, *args, **kwargs):
         Model.__init__(self,
                        user_id=user_id,
                        project_id=project_id,

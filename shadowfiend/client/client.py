@@ -12,6 +12,7 @@
 #    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 #    License for the specific language governing permissions and limitations
 #    under the License.
+
 import json
 import requests
 import six
@@ -90,7 +91,8 @@ class Client(object):
         if method:
             string_parts.extend([' -X ', method])
 
-        query_string = "?%s" % urlencode(kwargs.get('params')) if kwargs.get('params') else ""
+        query_string = ("?%s" % urlencode(kwargs.get('params'))
+                        if kwargs.get('params') else "")
         string_parts.extend([' ', url + query_string])
 
         if headers:
@@ -106,8 +108,7 @@ class Client(object):
         resp = self._send_request(url, method, **kwargs)
 
         if resp.status_code >= 400:
-            LOG.debug('Request returned failure status: %s',
-                          resp.status_code)
+            LOG.debug('Request returned failure status: %s' % resp.status_code)
             raise exception.from_response(resp, method, url)
         return resp, self._decode_body(resp)
 
