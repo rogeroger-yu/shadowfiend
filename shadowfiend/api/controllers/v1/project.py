@@ -23,6 +23,7 @@ from pecan import rest
 from shadowfiend.api import acl
 from shadowfiend.api.controllers.v1 import models
 from shadowfiend.common import exception
+from shadowfiend.common import policy
 from shadowfiend.common import timeutils
 from shadowfiend.db import models as db_models
 from shadowfiend.services import keystone as ks_client

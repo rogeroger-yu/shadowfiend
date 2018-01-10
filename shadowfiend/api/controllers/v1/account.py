@@ -26,6 +26,7 @@ from shadowfiend.common import exception
 from shadowfiend.common import policy
 from shadowfiend.common import utils as shadowutils
 from shadowfiend.db import models as db_models
+from shadowfiend.processor.service import fetcher
 from shadowfiend.services import kunkka
 
 from wsme import types as wtypes
@@ -34,6 +35,10 @@ from wsmeext.pecan import wsexpose
 
 LOG = log.getLogger(__name__)
 HOOK = pecan.request
+CONF = cfg.CONF
+CONF.import_opt('cloudkitty_period',
+                'shadowfiend.processor.config',
+                'processor')
 
 
 class ExistAccountController(rest.RestController):
@@ -43,11 +48,11 @@ class ExistAccountController(rest.RestController):
         'level': ['PUT'],
         'charges': ['GET'],
         'estimate': ['GET'],
-        'estimate_per_day': ['GET'],
     }
 
     def __init__(self, user_id):
         self._id = user_id
+        self.gnocchi_fetcher = fetcher.GnocchiFetcher()
 
     def _account(self, user_id=None):
         _id = user_id or self._id
@@ -70,7 +75,7 @@ class ExistAccountController(rest.RestController):
         policy.check_policy(HOOK.context, "account:charge")
 
         # check accountant charge value
-        lacv = int(cfg.CONF.limited_accountant_charge_value)
+        lacv = int(CONF.limited_accountant_charge_value)
         if data.value < -lacv or data.value > lacv:
             raise exception.InvalidChargeValue(value=data.value)
 
@@ -94,13 +99,13 @@ class ExistAccountController(rest.RestController):
             raise exception.DBError(reason=e)
         # else:
         #     # Notifier account
-        #     if cfg.CONF.notify_account_charged:
+        #     if CONF.notify_account_charged:
         #         account = HOOK.conductor_rpcapi.get_account(HOOK.context,
         #                                                     self._id).as_dict()
         #         contact = kunkka.get_uos_user(account['user_id'])
-        #         language = cfg.CONF.notification_language
+        #         language = CONF.notification_language
         #         self.notifier = notifier.NotifierService(
-        #             cfg.CONF.checker.notifier_level)
+        #             CONF.checker.notifier_level)
         #         self.notifier.notify_account_charged(
         #             HOOK.context, account, contact,
         #             data['type'], charge.value,
@@ -182,84 +187,35 @@ class ExistAccountController(rest.RestController):
                                         total_count=total_count,
                                         charges=charges_list)
 
-    @wsexpose(int)
-    def estimate(self):
-        """Estimate the hourly billing resources how many days to owed."""
-
-        pass
-        # if not cfg.CONF.enable_owe:
-        #     return -1
-
-        # user_id = acl.get_limited_to_user(
-        #     HOOK.headers, 'account_estimate') or self._id
-
-        # account = self._account(user_id=user_id)
-        # if account.balance < 0:
-        #     return -2
-
-        # orders = HOOK.conductor_rpcapi.get_active_orders(
-        #     HOOK.context,
-        #     user_id=user_id,
-        #     within_one_hour=True,
-        #     bill_methods=['hour'])
-        # if not orders:
-        #     return -1
-
-        # price_per_hour = 0
-        # for order in orders:
-        #     price_per_hour += gringutils._quantize_decimal(order.unit_price)
-
-        # if price_per_hour == 0:
-        #     return -1
-
-        # price_per_day = price_per_hour * 24
-        # days_to_owe_d = float(account.balance / price_per_day)
-        # days_to_owe = round(days_to_owe_d)
-        # if days_to_owe < days_to_owe_d:
-        #     days_to_owe = days_to_owe + 1
-        # if days_to_owe > 7:
-        #     return -1
-        # return days_to_owe
-
     @wsexpose(models.Estimate)
-    def estimate_per_day(self):
+    def estimate(self):
         """Get the price per day and the remaining days."""
 
-        pass
-        # user_id = acl.get_limited_to_user(
-        #     HOOK.headers, 'account_estimate') or self._id
+        user_id = acl.get_limited_to_user(
+            HOOK.headers, 'account:estimate') or self._id
 
-        # account = self._account(user_id=user_id)
-        # orders = HOOK.conductor_rpcapi.get_active_orders(
-        #     HOOK.context,
-        #     user_id=user_id,
-        #     within_one_hour=True,
-        #     bill_methods=['hour'])
-        # price_per_day = gringutils._quantize_decimal(0)
-        # if not orders:
-        #     if account.balance < 0:
-        #         return (price_per_day, -2)
-        #     else:
-        #         return (price_per_day, -1)
+        account = self._account(user_id=user_id)
+        price_per_hour = self.gnocchi_fetcher.get_current_consume(
+            HOOK.context.project_id)
 
-        # price_per_hour = 0
-        # for order in orders:
-        #     price_per_hour += gringutils._quantize_decimal(order.unit_price)
+        if price_per_hour == 0:
+            if account['balance'] < 0:
+                return models.Estimate(price_per_hour=price_per_hour,
+                                       remaining_day=-2)
+            else:
+                return models.Estimate(price_per_hour=price_per_hour,
+                                       remaining_day=-1)
+        elif price_per_hour > 0:
+            if account['balance'] < 0:
+                return models.Estimate(price_per_hour=price_per_hour,
+                                       remaining_day=-2)
+            else:
+                price_per_day = price_per_hour * 24
+                remaining_day = int(account['balance'] / price_per_day)
 
-        # if price_per_hour == 0:
-        #     if account.balance < 0:
-        #         return (price_per_day, -2)
-        #     else:
-        #         return (price_per_day, -1)
-        # elif price_per_hour > 0:
-        #     if account.balance < 0:
-        #         return (price_per_day, -2)
-        #     else:
-        #         price_per_day = price_per_hour * 24
-        #         remaining_day = int(account.balance / price_per_day)
-
-        # return models.Estimate(price_per_day=price_per_day,
-        #                        remaining_day=remaining_day)
+        return models.Estimate(balance=account['balance'],
+                               price_per_hour=price_per_hour,
+                               remaining_day=remaining_day)
 
 
 class ChargeController(rest.RestController):

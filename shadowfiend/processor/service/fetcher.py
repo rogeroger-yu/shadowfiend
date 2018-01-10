@@ -79,11 +79,12 @@ class KeystoneFetcher(KeystoneClient):
 class GnocchiFetcher(GnocchiClient):
     def __init__(self):
         super(GnocchiFetcher, self).__init__()
+        self._period = CONF.processor.cloudkitty_period
 
-    def get_state(self, tenant_id):
+    def get_state(self, tenant_id, state_type):
         query = {"=": {"project_id": tenant_id}}
         resources = self.gnocchi_client.resource.search(
-            resource_type='cloudkitty_state',
+            resource_type=('%s_state' % state_type),
             query=query,
             limit=1)
 
@@ -100,9 +101,9 @@ class GnocchiFetcher(GnocchiClient):
                     metric='state',
                     resource_id=state_resource_id,
                     query=query,
-                    aggregation="sum",
+                    aggregation='sum',
                     limit=1,
-                    granularity=CONF.processor.cloudkitty_period,
+                    granularity=self._period,
                     needed_overlap=0,
                     refresh=True)
             except gexceptions.MetricNotFound:
@@ -112,6 +113,26 @@ class GnocchiFetcher(GnocchiClient):
                 # gnocchi always returns measures ordered by timestamp
                 return timeutils.dt2ts(parser.parse(r[-1][0]))
 
+    def get_current_consume(self, tenant_id):
+        start_timestamp = (self.get_state(tenant_id, 'shadowfiend') or
+                           self.get_state(tenant_id, 'cloudkitty'))
+        query = {"=": {"project_id": tenant_id}}
+        try:
+            current_consume = self.gnocchi_client.metric.aggregation(
+                start=start_timestamp,
+                stop=start_timestamp + self._period,
+                query=query,
+                metrics='total.cost',
+                aggregation='sum',
+                granularity=self._period)
+        except gexceptions.NotAcceptable:
+            return
+        except gexceptions.Unauthorized:
+            return
+        except Exception: 
+            LOG.exception('Could not get current consume, Makesure '
+                          'your project have correct role relation')
+        return current_consume[0][2]
 
 # class TenantBillFetcher(Fetcher):
 #     def __init__():
@@ -139,6 +160,7 @@ class GnocchiFetcher(GnocchiClient):
 #     def image_list(self):
 #         return self.image_get(
 #             image_id='eb54e9f2-fb74-47f7-81f8-e6e449cc3a91')
+
 
 class NeutronFetcher(NeutronClient):
     def __init__(self):

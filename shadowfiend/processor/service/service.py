@@ -94,7 +94,7 @@ class ProcessorPeriodTasks(periodic_task.PeriodicTasks):
         return self.coord.get_lock(lock_name)
 
     def _check_state(self, tenant_id):
-        timestamp = self.gnocchi_fetcher.get_state(tenant_id)
+        timestamp = self.gnocchi_fetcher.get_state(tenant_id, 'cloudkitty')
         LOG.debug("timestamp is :%s" % timestamp)
         if not timestamp:
             month_start = timeutils.get_month_start()
@@ -127,6 +127,8 @@ class ProcessorPeriodTasks(periodic_task.PeriodicTasks):
         # -----------------cinder client test---------------------------
 
         self._check_state(tenants[0])
+        self.gnocchi_fetcher.get_current_consume(
+            'be7709676f3b47079c13ab3f171c635e')
 
 #        while len(tenants):
 #            for tenant in tenants[:]:

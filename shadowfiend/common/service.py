@@ -51,6 +51,9 @@ service_opts = [
     cfg.BoolOpt('periodic_enable',
                 default=True,
                 help='Enable periodic tasks'),
+    cfg.BoolOpt('enable_owe',
+                default=True,
+                help='Enable the logic of owe'),
     cfg.IntOpt('periodic_fuzzy_delay',
                default=60,
                help='Range of seconds to randomly delay when starting the'

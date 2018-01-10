@@ -144,7 +144,8 @@ class TransferMoneyBody(APIBase):
 
 
 class Estimate(APIBase):
-    price_per_day = float
+    balance = float
+    price_per_hour = float
     remaining_day = int
 
 

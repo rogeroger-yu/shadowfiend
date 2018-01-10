@@ -8,6 +8,7 @@
     "account:level": "rule:sf_admin",
     "account:charge": "rule:sf_admin",
     "account:get": "rule:sf_admin or rule:owner",
+    "account:estimate": "rule:sf_admin or rule:owner",
 
     "project:all": "rule:sf_admin",
     "project:post": "rule:sf_admin",
