@@ -308,12 +308,17 @@ class KeystoneBillingProtocol(object):
     def create_user(self, env, start_response, body,
                     user, balance=None, consumption=None,
                     level=None):
-        balance = balance or cfg.CONF.billing.initial_balance
+        balance = balance or 0
         consumption = consumption or 0
         level = level or cfg.CONF.billing.initial_level
         self.sf_client.create_account(
             user.user_id, user.domain_id,
             balance, consumption, level)
+
+        bonus = cfg.CONF.billing.initial_balance
+        self.sf_client.update_account(
+            user.user_id, bonus,
+            'bonus', 'system')
 
     def create_project(self, env, start_response, body,
                        project, consumption=None):

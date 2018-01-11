@@ -129,7 +129,7 @@ class GnocchiFetcher(GnocchiClient):
             return
         except gexceptions.Unauthorized:
             return
-        except Exception: 
+        except Exception:
             LOG.exception('Could not get current consume, Makesure '
                           'your project have correct role relation')
         return current_consume[0][2]

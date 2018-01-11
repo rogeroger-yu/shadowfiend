@@ -27,7 +27,7 @@ from shadowfiend.common import policy
 from shadowfiend.common import utils as shadowutils
 from shadowfiend.db import models as db_models
 from shadowfiend.processor.service import fetcher
-from shadowfiend.services import kunkka
+from shadowfiend.services import keystone as ks_client
 
 from wsme import types as wtypes
 from wsmeext.pecan import wsexpose
@@ -241,18 +241,12 @@ class ChargeController(rest.RestController):
             user = users.get(user_id)
             if user:
                 return user
-            contact = kunkka.get_uos_user(user_id) or {}
+            contact = ks_client.get_user(user_id) or {}
             user_name = contact.get('name')
             email = contact.get('email')
-            real_name = contact.get('real_name')
-            mobile = contact.get('phone')
-            company = contact.get('company')
             users[user_id] = models.User(user_id=user_id,
                                          user_name=user_name,
-                                         email=email,
-                                         real_name=real_name,
-                                         mobile=mobile,
-                                         company=company)
+                                         email=email)
             return users[user_id]
 
         charges = HOOK.conductor_rpcapi.get_charges(
@@ -268,7 +262,7 @@ class ChargeController(rest.RestController):
         charges_list = []
         for charge in charges:
             acharge = models.Charge.from_db_model(charge)
-            acharge.target = _get_user(charge.user_id)
+            acharge.target = _get_user(charge['user_id'])
             charges_list.append(acharge)
 
         total_price, total_count = (HOOK.conductor_rpcapi.

@@ -17,6 +17,7 @@ from oslo_config import cfg
 from oslo_log import log
 
 from keystoneclient import client as ks_client
+from keystoneclient.exceptions import NotFound
 from shadowfiend.services import BaseClient
 
 
@@ -60,3 +61,12 @@ def get_domain_list(name=None, enabled=None):
 def get_project_list(domain=None, name=None, user=None):
     ks = KeystoneClient()
     return ks.ks_client.projects.list(domain=domain, name=name, user=user)
+
+
+def get_user(user_id):
+    ks = KeystoneClient()
+    try:
+        user = ks.ks_client.users.get(user_id)
+        return user.__dict__
+    except NotFound:
+        return None

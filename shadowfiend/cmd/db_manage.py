@@ -16,8 +16,8 @@
 """Starter script for shadowfiend-db-manage."""
 
 from oslo_config import cfg
-
 from shadowfiend.db import migration
+from shadowfiend.services.gnocchi import GnocchiClient
 
 
 CONF = cfg.CONF
@@ -40,6 +40,11 @@ def do_revision():
                        autogenerate=CONF.command.autogenerate)
 
 
+def do_init():
+    _gnocchi = GnocchiClient()
+    _gnocchi.init_storage_backend()
+
+
 def add_command_parsers(subparsers):
     parser = subparsers.add_parser('version')
     parser.set_defaults(func=do_version)
@@ -56,6 +61,9 @@ def add_command_parsers(subparsers):
     parser.add_argument('-m', '--message')
     parser.add_argument('--autogenerate', action='store_true')
     parser.set_defaults(func=do_revision)
+    
+    parser = subparsers.add_parser('init')
+    parser.set_defaults(func=do_init)
 
 
 command_opt = cfg.SubCommandOpt('command',

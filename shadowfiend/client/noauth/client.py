@@ -44,6 +44,13 @@ class Client(object):
                      **kwargs)
         self.client.post('/accounts', body=_body)
 
+    def update_account(self, user_id, value, type, come_from, **kwargs):
+        _body = dict(value=value,
+                     type=type,
+                     come_from=come_from,
+                     **kwargs)
+        self.client.put('/accounts/%s' % user_id, body=_body)
+
     def create_project(self, project_id, domain_id, consumption, user_id=None):
         _body = dict(user_id=user_id,
                      project_id=project_id,

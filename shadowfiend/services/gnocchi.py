@@ -13,17 +13,26 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+import json
+import six
+
 from oslo_config import cfg
 from oslo_log import log
 
 from gnocchiclient import client as gnocchi_client
+from gnocchiclient import exceptions as gexceptions
 from shadowfiend.services import BaseClient
 
 
 LOG = log.getLogger(__name__)
 CONF = cfg.CONF
 
+CONF.import_opt('cloudkitty_period',
+                'shadowfiend.processor.config',
+                'processor')
+
 SERVICE_CLIENT_OPTS = 'service_client'
+SHADOWFIEND_STATE_RESOURCE = 'shadowfiend_state'
 
 
 class GnocchiClient(BaseClient):
@@ -34,3 +43,28 @@ class GnocchiClient(BaseClient):
             version='1',
             session=self.session,
             auth=self.auth)
+
+    def init_storage_backend(self):
+        _archive_policy_definition = json.loads(
+            '[{"granularity": ' +
+            six.text_type(CONF.processor.cloudkitty_period) +
+            ', "timespan": "90 days"}, '
+            '{"granularity": 86400, "timespan": "360 days"}, '
+            '{"granularity": 2592000, "timespan": "1800 days"}]')
+
+        # Creates rating archive-policy if not exists
+        try:
+            self.gnocchi_client.archive_policy.get('billing')
+        except gexceptions.ArchivePolicyNotFound:
+            ck_policy = {}
+            ck_policy["name"] = 'billing'
+            ck_policy["back_window"] = 0
+            ck_policy["aggregation_methods"] = ["sum", ]
+            ck_policy["definition"] = _archive_policy_definition
+            self.gnocchi_client.archive_policy.create(ck_policy)
+        # Creates state resource if it doesn't exist
+        try:
+            self.gnocchi_client.resource_type.create(
+                {'name': SHADOWFIEND_STATE_RESOURCE})
+        except gexceptions.ResourceAlreadyExists:
+            pass
