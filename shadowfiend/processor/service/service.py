@@ -13,6 +13,7 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+import eventlet
 import functools
 import random
 import uuid
@@ -24,7 +25,12 @@ from oslo_service import periodic_task
 from shadowfiend.common import context
 from shadowfiend.common import service as rpc_service
 from shadowfiend.common import timeutils
+from shadowfiend.conductor import api as conductor_api
 from shadowfiend.processor import service
+from shadowfiend.services import cinder
+from shadowfiend.services import glance
+from shadowfiend.services import neutron
+from shadowfiend.services import nova
 
 from tooz import coordination
 
@@ -33,6 +39,15 @@ LOG = log.getLogger(__name__)
 
 cfg.CONF.import_group('processor', 'shadowfiend.processor.config')
 process_period = CONF.processor.process_period
+
+TS_DAY = 86400
+service_map = {'computer': nova,
+               'image': glance,
+               'volume.volume': cinder,
+               'volume.snapshot': cinder,
+               'ratelimit.gw': neutron,
+               'ratelimit.fip': neutron,
+               'loadbalancer': neutron}
 
 
 def set_context(func):
@@ -71,17 +86,9 @@ class ProcessorService(rpc_service.Service):
 class ProcessorPeriodTasks(periodic_task.PeriodicTasks):
     def __init__(self, conf):
         super(ProcessorPeriodTasks, self).__init__(conf)
-        # keysteon fetcher
+        # Fetcher init
         self.keystone_fetcher = service.fetcher.KeystoneFetcher()
-
-        # gnocchi fetcher
         self.gnocchi_fetcher = service.fetcher.GnocchiFetcher()
-
-        # services test fetcher
-        # self.cinder_fetcher = service.fetcher.CinderFetcher()
-        # self.nova_fetcher = service.fetcher.NovaFetcher()
-        # self.glance_fetcher = service.fetcher.GlanceFetcher()
-        self.neutron_fetcher = service.fetcher.NeutronFetcher()
 
         # DLM
         self.coord = coordination.get_coordinator(
@@ -94,16 +101,19 @@ class ProcessorPeriodTasks(periodic_task.PeriodicTasks):
         return self.coord.get_lock(lock_name)
 
     def _check_state(self, tenant_id):
-        timestamp = self.gnocchi_fetcher.get_state(tenant_id, 'cloudkitty')
+        timestamp = self.gnocchi_fetcher.get_state(
+            tenant_id, 'shadowfiend', 'top')
         LOG.debug("timestamp is :%s" % timestamp)
         if not timestamp:
-            month_start = timeutils.get_month_start()
-            return timeutils.dt2ts(month_start)
+            LOG.debug("There is no shadowfiend timestamp"
+                      "Initialization from cloudkitty's first record")
+            timestamp = self.gnocchi_fetcher.get_state(
+                tenant_id, 'cloudkitty', 'bottom')
 
-        now = timeutils.utcnow_ts()
+        top_stamp = self.gnocchi_fetcher.get_state(
+            tenant_id, 'cloudkitty', 'top')
         next_timestamp = timestamp + CONF.processor.process_period
-        wait_time = CONF.processor.process_period
-        if next_timestamp + wait_time < now:
+        if next_timestamp < top_stamp:
             return next_timestamp
         return 0
 
@@ -113,42 +123,76 @@ class ProcessorPeriodTasks(periodic_task.PeriodicTasks):
         LOG.info("************************")
         LOG.info("Processing the correspondence between tenants and accounts")
 
-        # fetch billing enable tenants
-        tenants = self.keystone_fetcher.get_rate_tenants()
-        LOG.info("Tenants are %s" % str(tenants))
+        # fetch rating enable tenants
+        rate_tenants = self.keystone_fetcher.get_rate_tenants()
+        LOG.info("Tenants are %s" % str(rate_tenants))
 
-        # -----------------cinder client test---------------------------
-        # self.cinder_fetcher.get_volumes(volume_id='0296d18e-32dc-4ce8-9d37-aa98979128fe')
-        # self.nova_fetcher.flavor_list()
-        # self.glance_fetcher.image_list()
-        self.neutron_fetcher.networks_list(
-            '3427804b-70d9-4a99-9bac-39b6fbab0184')
-
-        # -----------------cinder client test---------------------------
-
-        self._check_state(tenants[0])
-        self.gnocchi_fetcher.get_current_consume(
-            'be7709676f3b47079c13ab3f171c635e')
-
-#        while len(tenants):
-#            for tenant in tenants[:]:
-#                lock = self._lock(tenant)
-#                if lock.acquire(blocking=False):
-#                    if not self._check_state(tenant):
-#                        tenants.remove(tenant)
-#                    else:
-#                        worker = Worker(self.collector,
-#                                        self.storage,
-#                                        tenant)
-#                        worker.run()
-#                    lock.release()
-#                self.coord.heartbeat()
-#            # NOTE(sheeprine): Slow down looping if all tenants are
-#            # being processed
-#            eventlet.sleep(1)
-#        # FIXME(sheeprine): We may cause a drift here
-#        eventlet.sleep(CONF.collect.period)
+        while len(rate_tenants):
+            for rate_tenant in rate_tenants[:]:
+                lock = self._lock(rate_tenant)
+                if lock.acquire(blocking=False):
+                    begin = self._check_state(rate_tenant)
+                    if not begin:
+                        rate_tenants.remove(rate_tenant)
+                    else:
+                        worker = Worker(ctx, rate_tenant, begin)
+                        worker.run()
+                    lock.release()
+                self.coord.heartbeat()
+            # NOTE(sheeprine): Slow down looping if all tenants are
+            # being processed
+            eventlet.sleep(1)
 
         # check every tenant's timestamp is prepared, push into thread queue
 
         LOG.info("Process successfully in this period")
+
+
+class Worker(object):
+    def __init__(self, ctx, tenant_id, begin):
+        self.begin = begin
+        self.context = ctx
+        self.tenant_id = tenant_id
+        # self.period = CONF.processor.process_period
+        self.gnocchi_fetcher = service.fetcher.GnocchiFetcher()
+        self.keystone_fetcher = service.fetcher.KeystoneFetcher()
+        self.conductor = conductor_api.API()
+
+    def run(self):
+        period_cost = self.gnocchi_fetcher.get_current_consume(
+            self.tenant_id, self.begin)
+        rate_user_id = self.keystone_fetcher.get_rate_user(self.tenant_id)
+        if rate_user_id == []:
+            LOG.error("There is no billing owner in you project: %s "
+                      "Please contact the administrator" % self.tenant_id)
+            raise ValueError("Not Found rate_user_id")
+        account = self.conductor.get_account(
+            self.context, rate_user_id)
+        balance = account['balance']
+        if account['owed'] and account['owed_at'] is not None:
+            owed_offset = (timeutils.utcnow_ts -
+                           timeutils.str2ts(account['owed_at']))
+            if (owed_offset <= account['level'] * TS_DAY or
+                    account['level'] == 9):
+                pass
+            else:
+                self.owed_action(self.tenant_id)
+        else:
+            self.conductor.update_account(
+                self.context,
+                user_id=rate_user_id,
+                balance=balance - period_cost)
+        self.gnocchi_fetcher.set_state(self.tenant_id, self.begin)
+
+    def owed_action(self, tenant_id):
+        # get billing resource
+        for _service in CONF.processor.services:
+            service_client = service_map[_service].get_client()
+            try:
+                resources = self.gnocchi_fetcher.get_resources(_service,
+                                                               tenant_id)
+                for resource in resources:
+                    result = service_client.drop_resource(resource)
+            except Exception as e:
+                LOG.warning("Error while drop resource: %s: %s" %
+                            (resource, e))

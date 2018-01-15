@@ -41,6 +41,15 @@ SERVICE_OPTS = [
     cfg.IntOpt('cloudkitty_period',
                default=3600,
                help=('cloudkitty period in seconds.')),
+    cfg.ListOpt('services',
+                default=['compute',
+                         'image',
+                         'volume.volume',
+                         'volume.snapshot',
+                         'ratelimit.fip',
+                         'ratelimit.gw',
+                         'loadbalancer'],
+                help=('Services to monitor.')),
 ]
 
 

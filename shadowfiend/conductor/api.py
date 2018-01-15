@@ -35,34 +35,34 @@ class API(rpc_service.API):
         """"Change billing_owner of this project"""
         kwargs = dict(project_id=project_id,
                       user_id=user_id)
-        return self._call('change_billing_owner', **kwargs)
+        return self._call(context, 'change_billing_owner', **kwargs)
 
     def get_billing_owner(self, context, project_id):
         kwargs = dict(project_id=project_id)
-        return self._call('get_billing_owner', **kwargs)
+        return self._call(context, 'get_billing_owner', **kwargs)
 
     def create_project(self, context, project):
-        return self._call('create_project', **project)
+        return self._call(context, 'create_project', **project)
 
     def get_project(self, context, project_id):
         kwargs = dict(project_id=project_id)
-        return self._call('get_project', **kwargs)
+        return self._call(context, 'get_project', **kwargs)
 
     def delete_project(self, context, project_id):
         kwargs = dict(project_id=project_id)
-        return self._call('delete_project', **kwargs)
+        return self._call(context, 'delete_project', **kwargs)
 
     def get_user_projects(self, context, user_id):
         kwargs = dict(user_id=user_id)
-        return self._call('get_user_projects', **kwargs)
+        return self._call(context, 'get_user_projects', **kwargs)
 
     def get_projects_by_project_ids(self, context, project_ids):
         kwargs = dict(project_ids=project_ids)
-        return self._call('get_projects_by_project_ids', **kwargs)
+        return self._call(context, 'get_projects_by_project_ids', **kwargs)
 
     def get_account(self, context, user_id):
         kwargs = dict(user_id=user_id)
-        return self._call('get_account', **kwargs)
+        return self._call(context, 'get_account', **kwargs)
 
     def get_accounts(self, context, owed=None, limit=None,
                      offset=None, active_from=None):
@@ -70,31 +70,37 @@ class API(rpc_service.API):
                       limit=limit,
                       offset=offset,
                       active_from=active_from)
-        return self._call('get_accounts', **kwargs)
+        return self._call(context, 'get_accounts', **kwargs)
 
     def get_accounts_count(self, context, owed=None,
                            active_from=None):
         kwargs = dict(owed=owed,
                       active_from=active_from)
-        return self._call('get_accounts_count', **kwargs)
+        return self._call(context, 'get_accounts_count', **kwargs)
 
     def create_account(self, context, account):
-        return self._call('create_account', **account)
+        return self._call(context, 'create_account', **account)
 
     def delete_account(self, context, user_id):
         kwargs = dict(user_id=user_id)
-        return self._call('delete_account', **kwargs)
+        return self._call(context, 'delete_account', **kwargs)
 
     def change_account_level(self, context, user_id, level):
         kwargs = dict(user_id=user_id,
                       level=level)
-        return self._call('change_account_level', **kwargs)
+        return self._call(context, 'change_account_level', **kwargs)
 
-    def update_account(self, context, user_id, operator, **data):
+    def update_account(self, context, user_id, balance, **data):
+        kwargs = dict(user_id=user_id,
+                      balance=balance,
+                      **data)
+        return self._call(context, 'update_account', **kwargs)
+
+    def charge_account(self, context, user_id, operator, **data):
         kwargs = dict(user_id=user_id,
                       operator=operator,
                       **data)
-        return self._call('update_account', **kwargs)
+        return self._call(context, 'charge_account', **kwargs)
 
     def get_charges(self, context, user_id=None, project_id=None, type=None,
                     start_time=None, end_time=None,
@@ -107,7 +113,7 @@ class API(rpc_service.API):
                       limit=limit,
                       offset=offset,
                       sort_key=sort_key)
-        return self._call('get_charges', **kwargs)
+        return self._call(context, 'get_charges', **kwargs)
 
     def get_charges_price_and_count(self, context, user_id=None, type=None,
                                     start_time=None, end_time=None):
@@ -115,22 +121,22 @@ class API(rpc_service.API):
                       type=type,
                       start_time=start_time,
                       end_time=end_time)
-        return self._call('get_charges_price_and_count', **kwargs)
+        return self._call(context, 'get_charges_price_and_count', **kwargs)
 
     def create_order(self, context, order):
-        return self._call('create_order', **order)
+        return self._call(context, 'create_order', **order)
 
     def close_order(self, context, order_id):
         kwargs = dict(order_id=order_id)
-        return self._call('close_order', **kwargs)
+        return self._call(context, 'close_order', **kwargs)
 
     def get_order(self, context, order_id):
         kwargs = dict(order_id=order_id)
-        return self._call('get_order', **kwargs)
+        return self._call(context, 'get_order', **kwargs)
 
     def get_order_by_resource_id(self, context, resource_id):
         kwargs = dict(resource_id=resource_id)
-        return self._call('get_order_by_resource_id', **kwargs)
+        return self._call(context, 'get_order_by_resource_id', **kwargs)
 
     def update_order(self, context, order_id, change_to,
                      cron_time, change_order_status, first_change_to):
@@ -139,4 +145,4 @@ class API(rpc_service.API):
                       cron_time=cron_time,
                       change_order_status=change_order_status,
                       first_change_to=first_change_to)
-        return self._call('update_order', **kwargs)
+        return self._call(context, 'update_order', **kwargs)

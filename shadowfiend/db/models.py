@@ -136,7 +136,8 @@ class Account(Model):
     def __init__(self,
                  user_id, domain_id, balance, consumption,
                  level, deleted=None, owed=None, created_at=None,
-                 updated_at=None, deleted_at=None, *args, **kwargs):
+                 updated_at=None, deleted_at=None, owed_at=None,
+                 *args, **kwargs):
         Model.__init__(
             self,
             user_id=user_id,
@@ -146,6 +147,7 @@ class Account(Model):
             level=level,
             deleted=deleted,
             owed=owed,
+            owed_at=owed_at,
             created_at=created_at,
             updated_at=updated_at,
             deleted_at=deleted_at)

@@ -39,6 +39,11 @@ cfg.CONF.register_opts(OPTS)
 FIPSET_IS_AVAILABLE = None
 
 
+def get_client(service):
+    if service in ['ratelimit.gw', 'ratelimit.fip', 'loadbalancer']:
+        return NeutronClient()
+
+
 class NeutronClient(BaseClient):
     def __init__(self):
         super(NeutronClient, self).__init__()

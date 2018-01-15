@@ -24,7 +24,6 @@ from keystoneauth1 import loading as ks_loading
 from shadowfiend.client.v1 import client
 from shadowfiend.common.exception import ShadowfiendException
 
-
 LOG = log.getLogger(__name__)
 CONF = cfg.CONF
 

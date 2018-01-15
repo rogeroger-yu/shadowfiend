@@ -25,7 +25,6 @@ from shadowfiend.api.controllers.v1 import models
 from shadowfiend.common import exception
 from shadowfiend.common import policy
 from shadowfiend.common import utils as shadowutils
-from shadowfiend.db import models as db_models
 from shadowfiend.processor.service import fetcher
 from shadowfiend.services import keystone as ks_client
 
@@ -78,12 +77,9 @@ class ExistAccountController(rest.RestController):
         lacv = int(CONF.limited_accountant_charge_value)
         if data.value < -lacv or data.value > lacv:
             raise exception.InvalidChargeValue(value=data.value)
-
-        # remarks = data.remarks if data.remarks != wsme.Unset else None
         operator = HOOK.context.user_id
-
         try:
-            charge = HOOK.conductor_rpcapi.update_account(
+            charge = HOOK.conductor_rpcapi.charge_account(
                 HOOK.context,
                 self._id,
                 operator=operator,
@@ -97,30 +93,14 @@ class ExistAccountController(rest.RestController):
             LOG.error('Fail to charge the account:%s,'
                       'charge value: %s' % (self._id, data.value))
             raise exception.DBError(reason=e)
-        # else:
-        #     # Notifier account
-        #     if CONF.notify_account_charged:
-        #         account = HOOK.conductor_rpcapi.get_account(HOOK.context,
-        #                                                     self._id).as_dict()
-        #         contact = kunkka.get_uos_user(account['user_id'])
-        #         language = CONF.notification_language
-        #         self.notifier = notifier.NotifierService(
-        #             CONF.checker.notifier_level)
-        #         self.notifier.notify_account_charged(
-        #             HOOK.context, account, contact,
-        #             data['type'], charge.value,
-        #             bonus=bonus.value if has_bonus else 0,
-        #             operator=operator,
-        #             operator_name=HOOK.context.user_name,
-        #             remarks=remarks, language=language)
         return models.Charge.from_db_model(charge)
 
-    @wsexpose(models.UserAccount)
+    @wsexpose(models.AdminAccount)
     def get(self):
         """Get this account."""
         user_id = acl.get_limited_to_user(
             HOOK.headers, 'account:get') or self._id
-        return db_models.Account(**self._account(user_id=user_id))
+        return models.AdminAccount(**self._account(user_id=user_id))
 
     @wsexpose(None)
     def delete(self):
@@ -191,23 +171,26 @@ class ExistAccountController(rest.RestController):
     def estimate(self):
         """Get the price per day and the remaining days."""
 
-        user_id = acl.get_limited_to_user(
-            HOOK.headers, 'account:estimate') or self._id
+        policy.check_policy(HOOK.context, "account:estimate")
 
+        user_id = self._id
         account = self._account(user_id=user_id)
         price_per_hour = self.gnocchi_fetcher.get_current_consume(
             HOOK.context.project_id)
 
         if price_per_hour == 0:
             if account['balance'] < 0:
-                return models.Estimate(price_per_hour=price_per_hour,
+                return models.Estimate(balance=account['balance'],
+                                       price_per_hour=price_per_hour,
                                        remaining_day=-2)
             else:
-                return models.Estimate(price_per_hour=price_per_hour,
+                return models.Estimate(balance=account['balance'],
+                                       price_per_hour=price_per_hour,
                                        remaining_day=-1)
         elif price_per_hour > 0:
             if account['balance'] < 0:
-                return models.Estimate(price_per_hour=price_per_hour,
+                return models.Estimate(balance=account['balance'],
+                                       price_per_hour=price_per_hour,
                                        remaining_day=-2)
             else:
                 price_per_day = price_per_hour * 24

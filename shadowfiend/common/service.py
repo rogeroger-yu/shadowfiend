@@ -195,8 +195,9 @@ class API(object):
                                            serializer=serializer,
                                            timeout=timeout)
 
-    def _call(self, method, *args, **kwargs):
-        return self._client.call(self._context, method, *args, **kwargs)
+    def _call(self, context, method, *args, **kwargs):
+        return self._client.call(
+            context or self._context, method, *args, **kwargs)
 
     def _cast(self, method, *args, **kwargs):
         self._client.cast(self._context, method, *args, **kwargs)

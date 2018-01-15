@@ -16,20 +16,18 @@
 from pecan import rest
 
 from shadowfiend.api.controllers.v1 import account
-# from shadowfiend.api.controllers.v1 import charge
+from shadowfiend.api.controllers.v1 import download
 from shadowfiend.api.controllers.v1 import models
 from shadowfiend.api.controllers.v1 import order
 from shadowfiend.api.controllers.v1 import project
-# from shadowfiend.api.controllers.v1 import relation
 
 from wsmeext.pecan import wsexpose
 
 
 class V1Controller(rest.RestController):
     accounts = account.AccountController()
+    downloads = download.DownloadsController()
     projects = project.ProjectController()
-#    relations = relation.RelationController()
-#    charges = charge.ChargeController()
     orders = order.OrderController()
 
     @wsexpose(models.Version)

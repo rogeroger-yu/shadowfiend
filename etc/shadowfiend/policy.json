@@ -15,6 +15,7 @@
 
     "charges:all": "rule:sf_admin",
     "charges:get": "rule:sf_admin or rule:owner",
+    "charges:export": "rule:owner",
 
     "context_is_admin": "",
     "context_is_domain_owner": ""

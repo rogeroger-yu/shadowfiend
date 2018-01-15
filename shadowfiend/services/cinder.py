@@ -31,6 +31,11 @@ CONF = cfg.CONF
 SERVICE_CLIENT_OPTS = 'service_client'
 
 
+def get_client(service):
+    if service in ['volume.volume', 'volume.snapshot']:
+        return CinderClient()
+
+
 class CinderClient(BaseClient):
     def __init__(self):
         super(CinderClient, self).__init__()

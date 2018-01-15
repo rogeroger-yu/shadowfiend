@@ -32,6 +32,11 @@ CONF = cfg.CONF
 SERVICE_CLIENT_OPTS = 'service_client'
 
 
+def get_client(service):
+    if service == 'compute':
+        return NovaClient()
+
+
 class NovaClient(BaseClient):
     def __init__(self):
         super(NovaClient, self).__init__()
@@ -62,6 +67,13 @@ class NovaClient(BaseClient):
                       original_status=server.status,
                       resource_type=const.RESOURCE_INSTANCE,
                       flavor=server.flavor)
+
+    def server_delete(self, instance_id):
+        try:
+            self.nova_client.servers.delete(instance_id)
+        except NotFound:
+            return None
+        return True
 
     def server_list_by_resv_id(self, resv_id,
                                region_name=None, detailed=False):
@@ -97,6 +109,9 @@ class NovaClient(BaseClient):
                        project_name=project_name,
                        created_at=created_at))
         return formatted_servers
+
+    def drop_resource(self, resource_id):
+        return self.server_delete(resource_id)
 
 
 class Server(Resource):

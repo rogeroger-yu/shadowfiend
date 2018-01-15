@@ -24,6 +24,7 @@ import calendar
 import datetime
 import iso8601
 import sys
+import time
 
 from oslo_utils import timeutils
 from six import moves
@@ -95,6 +96,11 @@ def nl2utc(timestamp):
     return timestamp.replace(tzinfo=None) - offset
 
 
+def str2ts(datetime):
+    return time.mktime(
+        time.strptime(datetime, _ISO8601_TIME_FORMAT))
+
+
 def strtime(at=None, fmt=PERFECT_TIME_FORMAT):
     """Returns formatted utcnow."""
     if not at:
@@ -119,11 +125,6 @@ def add_month(dt, stay_on_month=True):
     return add_days(next_month, dt.day, stay_on_month)
 
 
-def sub_month(dt, stay_on_month=True):
-    prev_month = get_last_month(dt)
-    return add_days(prev_month, dt.day, stay_on_month)
-
-
 def get_month_start(dt=None):
     if not dt:
         dt = utcnow()
@@ -131,22 +132,11 @@ def get_month_start(dt=None):
     return month_start
 
 
-def get_month_start_timestamp(dt=None):
-    return dt2ts(get_month_start(dt))
-
-
 def get_month_end(dt=None):
     month_start = get_month_start(dt)
     days_of_month = get_month_days(month_start)
     month_end = month_start.replace(day=days_of_month)
     return month_end
-
-
-def get_last_month(dt=None):
-    if not dt:
-        dt = utcnow()
-    month_end = get_month_start(dt) - datetime.timedelta(days=1)
-    return get_month_start(month_end)
 
 
 def get_next_month(dt=None):

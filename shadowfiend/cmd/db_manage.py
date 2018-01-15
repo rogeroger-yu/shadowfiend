@@ -61,7 +61,7 @@ def add_command_parsers(subparsers):
     parser.add_argument('-m', '--message')
     parser.add_argument('--autogenerate', action='store_true')
     parser.set_defaults(func=do_revision)
-    
+
     parser = subparsers.add_parser('init')
     parser.set_defaults(func=do_init)
 

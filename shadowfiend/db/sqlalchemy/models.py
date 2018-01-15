@@ -76,6 +76,7 @@ class Account(Base):
     owed = Column(Boolean, default=False)
     deleted = Column(Boolean, default=False)
 
+    owed_at = Column(DateTime)
     created_at = Column(DateTime, default=timeutils.utcnow)
     updated_at = Column(DateTime)
     deleted_at = Column(DateTime)

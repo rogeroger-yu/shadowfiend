@@ -1333,7 +1333,7 @@ class Connection(api.Connection):
 
     @oslo_db_api.wrap_db_retry(max_retries=5, retry_on_deadlock=True,
                                retry_on_request=True)
-    def update_account(self, context, user_id, project_id=None,
+    def charge_account(self, context, user_id, project_id=None,
                        operator=None, **data):
         """Do the charge charge account trick"""
 
@@ -1368,6 +1368,35 @@ class Connection(api.Connection):
 
         self._transfer(charge_ref)
         return self._row_to_db_charge_model(charge_ref).__dict__
+
+    @oslo_db_api.wrap_db_retry(max_retries=5, retry_on_deadlock=True,
+                               retry_on_request=True)
+    def update_account(self, context, user_id, project_id=None,
+                       **data):
+        """Update account"""
+
+        session = get_session()
+        with session.begin():
+            balance = 0
+
+            account = model_query(
+                context,
+            sa_models.Account,
+            session=session).filter_by(user_id=user_id).one()
+            params = dict(balance=balance,
+                          updated_at=datetime.datetime.utcnow())
+            if balance < 0:
+                params.update(owed=True, owed_at=datetime.datetime.utcnow())
+            filters = params.keys()
+            filters.append('user_id')
+            self._compare_and_swap(
+                model_query(context,
+                            sa_models.Account,
+                            session=session),
+                account,
+                filters,
+                params,
+                exception.AccountUpdateFailed())
 
     @require_admin_context
     @oslo_db_api.wrap_db_retry(max_retries=5, retry_on_deadlock=True,

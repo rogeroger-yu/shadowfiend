@@ -69,8 +69,10 @@ class AdminAccount(APIBase):
     sales_id = wtypes.text
     owed = bool
     inviter = wtypes.text
+    owed_at = wtypes.text
     created_at = wtypes.text
-    update_at = wtypes.text
+    updated_at = wtypes.text
+    deleted_at = wtypes.text
 
 
 class AdminAccounts(APIBase):
@@ -83,9 +85,6 @@ class User(APIBase):
     user_id = wtypes.text
     user_name = wtypes.text
     email = wtypes.text
-    real_name = wtypes.text
-    mobile = wtypes.text
-    company = wtypes.text
 
 
 class UserAccount(APIBase):

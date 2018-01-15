@@ -39,6 +39,7 @@ def upgrade():
         sa.Column('owed', sa.Boolean),
         sa.Column('deleted', sa.Boolean),
 
+        sa.Column('owed_at', sa.DateTime),
         sa.Column('created_at', sa.DateTime),
         sa.Column('updated_at', sa.DateTime),
         sa.Column('deleted_at', sa.DateTime),

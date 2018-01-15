@@ -56,11 +56,17 @@ class Handler(object):
         LOG.debug('change account level: Received message from RPC.')
         return cls.dbapi.change_account_level(context, **kwargs)
 
+    def charge_account(cls, context, **kwargs):
+        LOG.debug('update account: Received message from RPC.')
+        return cls.dbapi.charge_account(context,
+                                        kwargs.pop('user_id'),
+                                        kwargs.pop('operator'),
+                                        **kwargs)
+
     def update_account(cls, context, **kwargs):
         LOG.debug('update account: Received message from RPC.')
         return cls.dbapi.update_account(context,
                                         kwargs.pop('user_id'),
-                                        kwargs.pop('operator'),
                                         **kwargs)
 
     def get_charges(cls, context, **kwargs):

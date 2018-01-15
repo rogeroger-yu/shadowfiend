@@ -29,6 +29,11 @@ from shadowfiend.services import Resource
 LOG = log.getLogger(__name__)
 
 
+def get_client(service):
+    if service == 'image':
+        return GlanceClient()
+
+
 class GlanceClient(BaseClient):
     def __init__(self):
         super(GlanceClient, self).__init__()
