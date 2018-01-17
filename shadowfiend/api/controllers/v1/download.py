@@ -146,7 +146,7 @@ class OrdersController(rest.RestController):
 
         if limit_user_id:  # normal user
             user_id = None
-            projects = keystone.get_projects_by_user(limit_user_id)
+            projects = ks_client.get_project_list(user=limit_user_id)
             _project_ids = [project['id'] for project in projects]
             if project_id and project_id in _project_ids:
                 project_ids = [project_id]
@@ -179,7 +179,7 @@ class OrdersController(rest.RestController):
             if project:
                 return project
             try:
-                project = keystone.get_project(project_id)
+                project = ks_client.get_project_list(project_id)
                 project_name = project.name if project else None
                 projects[project_id] = models.SimpleProject(
                     project_id=project_id,
@@ -213,8 +213,11 @@ class OrdersController(rest.RestController):
                    u"项目名称", u"创建时间")
         data = []
 
-        adata = (u"过滤条件: 资源类型: %s, 资源状态: %s，用户ID: %s, 项目ID: %s, 区域: %s, 起始时间: %s,  结束时间: %s" %
-                 (type, status, user_id, project_id, region_id, start_time, end_time),
+        adata = (u"过滤条件: 资源类型: %s, 资源状态: %s,"
+                 "用户ID: %s, 项目ID: %s, 区域: %s, 起始时间: %s,"
+                 "结束时间: %s" %
+                 (type, status, user_id, project_id,
+                  region_id, start_time, end_time),
                  "", "", "", "", "", "", "", "", "", "", "")
         data.append(adata)
 

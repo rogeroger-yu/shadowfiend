@@ -42,9 +42,9 @@ def parse_isotime(timestamp):
     try:
         return iso8601.parse_date(timestamp)
     except iso8601.ParseError as e:
-        raise ValueError(unicode(e))
+        raise ValueError(e)
     except TypeError as e:
-        raise ValueError(unicode(e))
+        raise ValueError(e)
 
 
 def dt2ts(orig_dt):

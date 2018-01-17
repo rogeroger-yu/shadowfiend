@@ -1,5 +1,5 @@
-# -*- coding: utf-8 -*-
-# Copyright 2017 Openstack Foundation.
+# Copyright 2013 Red Hat, Inc.
+# All Rights Reserved.
 #
 #    Licensed under the Apache License, Version 2.0 (the "License"); you may
 #    not use this file except in compliance with the License. You may obtain
@@ -13,21 +13,14 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-from oslo_config import cfg
-from oslo_db import options
-
-from shadowfiend.common import paths
+from shadowfiend.tests.unit.api import base as api_base
 
 
-sql_opts = [
-    cfg.StrOpt('mysql_engine',
-               default='InnoDB',
-               help='MySQL engine to use.')
-]
+class TestRoot(api_base.FunctionalTest):
 
-_DEFAULT_SQL_CONNECTION = ('sqlite:///' +
-                           paths.state_path_def('shadowfiend.sqlite'))
+    def test_get_root(self):
+        response = self.get_json('/', path_prefix='')
+        # Check fields are not empty
+        [self.assertNotIn(f, ['', []]) for f in response]
 
-
-cfg.CONF.register_opts(sql_opts, 'database')
-options.set_defaults(cfg.CONF, _DEFAULT_SQL_CONNECTION)
+        self.assertEqual('v1', response['versions'][0]['id'])

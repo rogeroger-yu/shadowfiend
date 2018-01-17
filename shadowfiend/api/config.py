@@ -16,7 +16,7 @@
 from shadowfiend.api import hooks
 
 app = {
-    'root': 'shadowfiend.api.controllers.v1.V1Controller',
+    'root': 'shadowfiend.api.controllers.root.RootController',
     'noauth_root': 'shadowfiend.api.controllers.noauth.NoauthController',
     'modules': ['shadowfiend.api'],
     'debug': False,

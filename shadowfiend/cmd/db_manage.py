@@ -78,5 +78,6 @@ def main():
     CONF(project='shadowfiend')
     CONF.command.func()
 
+
 if __name__ == '__main__':
     main()

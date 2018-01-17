@@ -112,7 +112,7 @@ class GnocchiFetcher(GnocchiClient):
                 resource={'id': uuid.uuid4(),
                           'user_id': None,
                           'project_id': tenant_id})
-            resourcer_id = resource['id']
+            resource_id = resource['id']
         else:
             resource_id = resources[0]['id']
         # get metric, if not, create it

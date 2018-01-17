@@ -1,5 +1,5 @@
-# -*- coding: utf-8 -*-
-
+# Copyright (c) 2012 OpenStack Foundation
+#
 # Licensed under the Apache License, Version 2.0 (the "License"); you may
 # not use this file except in compliance with the License. You may obtain
 # a copy of the License at
@@ -12,17 +12,28 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
+
+policy_data = """
+{
+    "sf_admin": "role:admin",
+    "owner": "user_id:%(user_id)s",
+
+    "account:post": "",
+    "account:delete": "",
+    "account:all": "",
+    "account:level": "",
+    "account:charge": "",
+    "account:get": "",
+    "account:estimate": "",
+
+    "project:all": "",
+    "project:post": "",
+
+    "charges:all": "",
+    "charges:get": "",
+    "charges:export": "",
+
+    "context_is_admin": "role:admin",
+    "context_is_domain_owner": ""
+}
 """
-test_shadowfiend
-----------------------------------
-
-Tests for `shadowfiend` module.
-"""
-
-from shadowfiend.tests import base
-
-
-class TestShadowfiend(base.TestCase):
-
-    def test_something(self):
-        pass

@@ -41,7 +41,6 @@ from sqlalchemy import asc
 from sqlalchemy import desc
 from sqlalchemy import func
 from sqlalchemy import not_
-from sqlalchemy.orm.exc import MultipleResultsFound
 from sqlalchemy.orm.exc import NoResultFound
 
 LOG = log.getLogger(__name__)
@@ -396,106 +395,6 @@ class Connection(api.Connection):
                       'we will fetch another one')
             raise db_exc.RetryRequest(failed_exception)
 
-    def create_product(self, context, product):
-        session = get_session()
-        with session.begin():
-            product_ref = sa_models.Product()
-            product_ref.update(self._product_object_to_dict(product))
-            session.add(product_ref)
-        return self._row_to_db_product_model(product_ref)
-
-    def get_products_count(self, context, filters=None):
-        query = get_session().query(
-            sa_models.Product,
-            func.count(sa_models.Product.id).label('count'))
-        if 'name' in filters:
-            query = query.filter_by(name=filters['name'])
-        if 'service' in filters:
-            query = query.filter_by(service=filters['service'])
-        if 'region_id' in filters:
-            query = query.filter_by(region_id=filters['region_id'])
-        query = query.filter_by(deleted=False)
-
-        return query.one().count or 0
-
-    def get_products(self, context, filters=None, read_deleted=False,
-                     limit=None, offset=None, sort_key=None,
-                     sort_dir=None):
-        query = get_session().query(sa_models.Product)
-        if 'name' in filters:
-            query = query.filter_by(name=filters['name'])
-        if 'service' in filters:
-            query = query.filter_by(service=filters['service'])
-        if 'region_id' in filters:
-            query = query.filter_by(region_id=filters['region_id'])
-        if not read_deleted:
-            query = query.filter_by(deleted=False)
-
-        result = paginate_query(context, sa_models.Product,
-                                limit=limit, offset=offset,
-                                sort_key=sort_key, sort_dir=sort_dir,
-                                query=query)
-
-        return (self._row_to_db_product_model(p) for p in result)
-
-    def get_product(self, context, product_id):
-        query = model_query(context, sa_models.Product).\
-            filter_by(product_id=product_id).\
-            filter_by(deleted=False)
-        try:
-            ref = query.one()
-        except NoResultFound:
-            raise exception.ProductIdNotFound(product_id)
-        return self._row_to_db_product_model(ref)
-
-    @oslo_db_api.wrap_db_retry(max_retries=5, retry_on_deadlock=True,
-                               retry_on_request=True)
-    def delete_product(self, context, product_id):
-        product = self.get_product(context, product_id)
-        product.deleted = True
-
-        session = get_session()
-        with session.begin():
-            query = model_query(context, sa_models.Product)
-            query = query.filter_by(product_id=product.product_id)
-            query.update(product.as_dict(),
-                         synchronize_session='fetch')
-            ref = query.one()
-        return self._row_to_db_product_model(ref)
-
-    @oslo_db_api.wrap_db_retry(max_retries=5, retry_on_deadlock=True,
-                               retry_on_request=True)
-    def update_product(self, context, product):
-        session = get_session()
-        with session.begin():
-            query = model_query(context, sa_models.Product)
-            query = query.filter_by(product_id=product.product_id)
-            query.update(self._product_object_to_dict(product),
-                         synchronize_session='fetch')
-            ref = query.one()
-        return self._row_to_db_product_model(ref)
-
-    def get_product_by_name(self, context, product_name, service, region_id):
-        try:
-            product = model_query(context, sa_models.Product).\
-                filter_by(name=product_name).\
-                filter_by(service=service).\
-                filter_by(region_id=region_id).\
-                filter_by(deleted=False).\
-                one()
-        except NoResultFound:
-            msg = "Product with name(%s) within service(%s) in region_id(%s) "
-            "not found" % (product_name, service, region_id)
-            LOG.warning(msg)
-            return None
-        except MultipleResultsFound:
-            msg = "Duplicated products with name(%s) within service(%s) in "
-            "region_id(%s)" % (product_name, service, region_id)
-            LOG.error(msg)
-            raise exception.DuplicatedProduct(reason=msg)
-
-        return self._row_to_db_product_model(product)
-
     def _update_consumption(self, context, session,
                             obj, model, total_price,
                             user_id=False):
@@ -513,8 +412,7 @@ class Connection(api.Connection):
                                exception.ConsumptionUpdateFailed())
 
     @require_admin_context
-    @oslo_db_api.wrap_db_retry(max_retries=5, retry_on_deadlock=True,
-                               retry_on_request=True)
+    @oslo_db_api.wrap_db_retry(max_retries=5, retry_on_deadlock=True)
     def create_order(self, context, order):
         session = get_session()
         with session.begin():
@@ -650,8 +548,7 @@ class Connection(api.Connection):
         return self._row_to_db_order_model(ref).__dict__
 
     @require_admin_context
-    @oslo_db_api.wrap_db_retry(max_retries=5, retry_on_deadlock=True,
-                               retry_on_request=True)
+    @oslo_db_api.wrap_db_retry(max_retries=5, retry_on_deadlock=True)
     def update_order(self, context, **kwargs):
         """Change unit price of this order"""
 
@@ -687,8 +584,7 @@ class Connection(api.Connection):
                 exception.OrderUpdateFailed())
 
     @require_admin_context
-    @oslo_db_api.wrap_db_retry(max_retries=5, retry_on_deadlock=True,
-                               retry_on_request=True)
+    @oslo_db_api.wrap_db_retry(max_retries=5, retry_on_deadlock=True)
     def close_order(self, context, order_id):
         session = get_session()
         with session.begin():
@@ -875,338 +771,6 @@ class Connection(api.Connection):
                                 query=query)
         return (self._row_to_db_order_model(o) for o in result)
 
-    @require_admin_context
-    @oslo_db_api.wrap_db_retry(max_retries=5, retry_on_deadlock=True,
-                               retry_on_request=True)
-    def create_subscription(self, context, **subscription):
-        session = get_session()
-        with session.begin():
-            # Get product
-            try:
-                product = model_query(
-                    context, sa_models.Product, session=session).filter_by(
-                        name=subscription['product_name']).filter_by(
-                            service=subscription['service']).filter_by(
-                                region_id=subscription['region_id']).\
-                    filter_by(deleted=False).one()
-            except NoResultFound:
-                msg = 'Product with name(%s) within service(%s) in' \
-                    ' region_id(%s) not found' % (
-                        subscription['product_name'], subscription['service'],
-                        subscription['region_id'])
-                LOG.warning(msg)
-                return None
-            except MultipleResultsFound:
-                msg = 'Duplicated products with name(%s) within' \
-                    'service(%s) in region_id(%s)' % (
-                        subscription['product_name'], subscription['service'],
-                        subscription['region_id'])
-                LOG.error(msg)
-                raise exception.DuplicatedProduct(reason=msg)
-
-            quantity = subscription['resource_volume']
-            project = self.get_project(context, subscription['project_id'])
-
-            subscription = sa_models.Subscription(
-                subscription_id=uuidutils.generate_uuid(),
-                type=subscription['type'],
-                product_id=product.product_id,
-                unit_price=product.unit_price,
-                order_id=subscription['order_id'],
-                user_id=subscription['user_id'],
-                project_id=subscription['project_id'],
-                region_id=subscription['region_id'],
-                domain_id=project.domain_id,
-                quantity=quantity,
-            )
-
-            session.add(subscription)
-
-        return self._row_to_db_subscription_model(subscription)
-
-    @oslo_db_api.wrap_db_retry(max_retries=5, retry_on_deadlock=True,
-                               retry_on_request=True)
-    def update_subscription(self, context, **kwargs):
-        session = get_session()
-        with session.begin():
-            subs = model_query(
-                context, sa_models.Subscription, session=session).\
-                filter_by(order_id=kwargs['order_id']).\
-                filter_by(type=kwargs['change_to']).\
-                all()
-
-            for sub in subs:
-                params = dict(quantity=kwargs['quantity'])
-                filters = params.keys()
-                filters.append('type')
-                filters.append('order_id')
-                self._compare_and_swap(model_query(context,
-                                                   sa_models.Subscription,
-                                                   session=session),
-                                       sub, filters, params,
-                                       exception.SubscriptionUpdateFailed())
-
-    @oslo_db_api.wrap_db_retry(max_retries=5, retry_on_deadlock=True,
-                               retry_on_request=True)
-    def update_flavor_subscription(self, context, **kwargs):
-        session = get_session()
-        with session.begin():
-            try:
-                if kwargs['old_flavor']:
-                    old_product = model_query(
-                        context, sa_models.Product, session=session).\
-                        filter_by(name=kwargs['old_flavor']).\
-                        filter_by(service=kwargs['service']).\
-                        filter_by(region_id=kwargs['region_id']).\
-                        filter_by(deleted=False).\
-                        one()
-                new_product = model_query(
-                    context, sa_models.Product, session=session).\
-                    filter_by(name=kwargs['new_flavor']).\
-                    filter_by(service=kwargs['service']).\
-                    filter_by(region_id=kwargs['region_id']).\
-                    filter_by(deleted=False).\
-                    one()
-            except NoResultFound:
-                msg = "Product with name(%s/%s) within service(%s) in region_id(%s) not found" % \
-                    (kwargs['old_flavor'], kwargs['new_flavor'],
-                     kwargs['service'], kwargs['region_id'])
-                LOG.error(msg)
-                return None
-            except MultipleResultsFound:
-                msg = "Duplicated products with name(%s/%s) within service(%s) in region_id(%s)" % \
-                    (kwargs['old_flavor'], kwargs['new_flavor'],
-                     kwargs['service'], kwargs['region_id'])
-                LOG.error(msg)
-                raise exception.DuplicatedProduct(reason=msg)
-
-            try:
-                if kwargs['old_flavor']:
-                    sub = model_query(
-                        context, sa_models.Subscription, session=session).\
-                        filter_by(order_id=kwargs['order_id']).\
-                        filter_by(product_id=old_product.product_id).\
-                        filter_by(type=kwargs['change_to']).\
-                        one()
-                else:
-                    subs = model_query(
-                        context, sa_models.Subscription, session=session).\
-                        filter_by(order_id=kwargs['order_id']).\
-                        filter_by(type=kwargs['change_to']).\
-                        all()
-                    sub = None
-                    for s in subs:
-                        p = model_query(
-                            context, sa_models.Product, session=session).\
-                            filter_by(product_id=s.product_id).one()
-                        if p.name.startswith('instance'):
-                            sub = s
-                            break
-                    if not sub:
-                        return None
-            except NoResultFound:
-                msg = "Subscription with order_id(%s), type(%s) not found" % \
-                    (kwargs['order_id'], kwargs['change_to'])
-                LOG.error(msg)
-                return None
-
-            params = dict(unit_price=new_product.unit_price,
-                          product_id=new_product.product_id)
-            filters = params.keys()
-            filters.append('order_id')
-            filters.append('type')
-            self._compare_and_swap(model_query(context,
-                                               sa_models.Subscription,
-                                               session=session),
-                                   sub, filters, params,
-                                   exception.SubscriptionUpdateFailed())
-
-    @require_context
-    def get_subscriptions_by_order_id(self, context, order_id, user_id=None,
-                                      type=None, product_id=None):
-        query = model_query(context, sa_models.Subscription).\
-            filter_by(order_id=order_id)
-        if type:
-            query = query.filter_by(type=type)
-        if user_id:
-            query = query.filter_by(user_id=user_id)
-        if product_id:
-            query = query.filter_by(product_id=product_id)
-        ref = query.all()
-        return (self._row_to_db_subscription_model(r) for r in ref)
-
-    @require_context
-    def get_subscription(self, context, subscription_id):
-        session = get_session()
-        with session.begin():
-            query = model_query(context, sa_models.Subscription)
-            query = query.filter_by(subscription_id=subscription_id)
-            ref = query.one()
-        return self._row_to_db_subscription_model(ref)
-
-    @require_admin_context
-    def get_subscriptions_by_product_id(self, context, product_id,
-                                        start_time=None, end_time=None,
-                                        limit=None, offset=None, sort_key=None,
-                                        sort_dir=None):
-        query = model_query(context, sa_models.Subscription).\
-            filter_by(product_id=product_id)
-
-        if all([start_time, end_time]):
-            query = query.filter(
-                sa_models.Subscription.created_at >= start_time)
-            query = query.filter(
-                sa_models.Subscription.created_at < end_time)
-
-        ref = paginate_query(context, sa_models.Subscription,
-                             limit=limit, offset=offset,
-                             sort_key=sort_key, sort_dir=sort_dir,
-                             query=query)
-
-        return (self._row_to_db_subscription_model(r) for r in ref)
-
-    @require_context
-    def get_bill(self, context, bill_id):
-        session = get_session()
-        with session.begin():
-            query = model_query(context, sa_models.Bill)
-            ref = query.filter_by(bill_id=bill_id).one()
-        return self._row_to_db_bill_model(ref)
-
-    @require_context
-    def get_latest_bill(self, context, order_id):
-        session = get_session()
-        with session.begin():
-            query = model_query(context, sa_models.Bill)
-            query = query.filter_by(order_id=order_id)
-            ref = query.order_by(desc(sa_models.Bill.id)).all()[0]
-        return self._row_to_db_bill_model(ref)
-
-    @require_context
-    def get_owed_bills(self, context, order_id):
-        session = get_session()
-        with session.begin():
-            query = model_query(context, sa_models.Bill)
-            query = query.filter_by(order_id=order_id)
-            query = query.filter_by(status=const.BILL_OWED)
-            ref = query.order_by(desc(sa_models.Bill.id)).all()
-        return (self._row_to_db_bill_model(r) for r in ref)
-
-    @require_context
-    def get_bills_by_order_id(self, context, order_id, type=None,
-                              start_time=None, end_time=None,
-                              limit=None, offset=None, sort_key=None,
-                              sort_dir=None):
-        query = get_session().query(sa_models.Bill).\
-            filter_by(order_id=order_id)
-        if type:
-            query = query.filter_by(type=type)
-
-        if all([start_time, end_time]):
-            query = query.filter(sa_models.Bill.start_time >= start_time,
-                                 sa_models.Bill.start_time < end_time)
-
-        result = paginate_query(context, sa_models.Bill,
-                                limit=limit, offset=offset,
-                                sort_key=sort_key, sort_dir=sort_dir,
-                                query=query)
-
-        return (self._row_to_db_bill_model(r) for r in result)
-
-    @require_context
-    def get_bills(self, context, start_time=None, end_time=None,
-                  project_id=None, type=None, limit=None, offset=None,
-                  sort_key=None, sort_dir=None):
-        query = model_query(context, sa_models.Bill)
-
-        if type:
-            query = query.filter_by(type=type)
-
-        if project_id:
-            if not context.is_admin:
-                raise exception.NotAuthorized()
-            query = query.filter_by(project_id=project_id)
-
-        query = query.filter_by(status=const.BILL_PAYED)
-
-        if all([start_time, end_time]):
-            query = query.filter(sa_models.Bill.start_time >= start_time,
-                                 sa_models.Bill.start_time < end_time)
-
-        result = paginate_query(context, sa_models.Bill,
-                                limit=limit, offset=offset,
-                                sort_key=sort_key, sort_dir=sort_dir,
-                                query=query)
-
-        return (self._row_to_db_bill_model(b) for b in result)
-
-    @require_context
-    def get_bills_count(self, context, order_id=None, project_id=None,
-                        type=None, start_time=None, end_time=None):
-        query = get_session().query(
-            sa_models.Bill,
-            func.count(sa_models.Bill.id).label('count'))
-        if order_id:
-            query = query.filter_by(order_id=order_id)
-        if project_id:
-            if not context.is_admin:
-                raise exception.NotAuthorized()
-            query = query.filter_by(project_id=project_id)
-        if type:
-            query = query.filter_by(type=type)
-
-        if all([start_time, end_time]):
-            query = query.filter(sa_models.Bill.start_time >= start_time,
-                                 sa_models.Bill.start_time < end_time)
-
-        return query.one().count or 0
-
-    @require_context
-    def get_bills_sum(self, context, region_id=None, start_time=None,
-                      end_time=None, order_id=None, user_id=None,
-                      project_id=None, type=None):
-        query = get_session().query(
-            sa_models.Bill,
-            func.sum(sa_models.Bill.total_price).label('sum'))
-
-        if order_id:
-            query = query.filter_by(order_id=order_id)
-        if user_id:
-            query = query.filter_by(user_id=user_id)
-        if project_id:
-            query = query.filter_by(project_id=project_id)
-        if type:
-            query = query.filter_by(type=type)
-        if region_id:
-            query = query.filter_by(region_id=region_id)
-
-        if all([start_time, end_time]):
-            query = query.filter(sa_models.Bill.start_time >= start_time,
-                                 sa_models.Bill.start_time < end_time)
-
-        return query.one().sum or 0
-
-    @require_context
-    def get_bills_count_and_sum(self, context, order_id=None, project_id=None,
-                                type=None, start_time=None, end_time=None):
-        query = model_query(context, sa_models.Bill,
-                            func.count(sa_models.Bill.id).label('count'),
-                            func.sum(sa_models.Bill.total_price).label('sum'))
-        if order_id:
-            query = query.filter_by(order_id=order_id)
-        if project_id:
-            if not context.is_admin:
-                raise exception.NotAuthorized()
-            query = query.filter_by(project_id=project_id)
-        if type:
-            query = query.filter_by(type=type)
-
-        if all([start_time, end_time]):
-            query = query.filter(sa_models.Bill.start_time >= start_time,
-                                 sa_models.Bill.start_time < end_time)
-
-        return query.one().count or 0, query.one().sum or 0
-
     def create_account(self, context, account):
         session = get_session()
         with session.begin():
@@ -1231,8 +795,7 @@ class Connection(api.Connection):
         self._transfer(account_ref)
         return self._row_to_db_account_model(account_ref).__dict__
 
-    @oslo_db_api.wrap_db_retry(max_retries=5, retry_on_deadlock=True,
-                               retry_on_request=True)
+    @oslo_db_api.wrap_db_retry(max_retries=5, retry_on_deadlock=True)
     def delete_account(self, context, user_id):
         """delete the account and projects"""
 
@@ -1258,18 +821,6 @@ class Connection(api.Connection):
                 filter_by(user_id=user_id).all()
             for user_project in user_projects:
                 session.delete(user_project)
-
-    def get_invitees(self, context, inviter, limit=None, offset=None):
-        query = get_session().query(sa_models.Account).\
-            filter_by(inviter=inviter)
-
-        total_count = len(query.all())
-
-        result = paginate_query(context, sa_models.Account,
-                                limit=limit, offset=offset,
-                                query=query)
-
-        return (self._row_to_db_account_model(r) for r in result), total_count
 
     def get_accounts(self, context, user_id=None, read_deleted=False,
                      owed=None, limit=None, offset=None,
@@ -1311,8 +862,7 @@ class Connection(api.Connection):
 
         return query.one().count or 0
 
-    @oslo_db_api.wrap_db_retry(max_retries=5, retry_on_deadlock=True,
-                               retry_on_request=True)
+    @oslo_db_api.wrap_db_retry(max_retries=5, retry_on_deadlock=True)
     def change_account_level(self, context, user_id, level, project_id=None):
         session = get_session()
         with session.begin():
@@ -1331,8 +881,7 @@ class Connection(api.Connection):
         self._transfer(account_ref)
         return self._row_to_db_account_model(account_ref).__dict__
 
-    @oslo_db_api.wrap_db_retry(max_retries=5, retry_on_deadlock=True,
-                               retry_on_request=True)
+    @oslo_db_api.wrap_db_retry(max_retries=5, retry_on_deadlock=True)
     def charge_account(self, context, user_id, project_id=None,
                        operator=None, **data):
         """Do the charge charge account trick"""
@@ -1369,8 +918,7 @@ class Connection(api.Connection):
         self._transfer(charge_ref)
         return self._row_to_db_charge_model(charge_ref).__dict__
 
-    @oslo_db_api.wrap_db_retry(max_retries=5, retry_on_deadlock=True,
-                               retry_on_request=True)
+    @oslo_db_api.wrap_db_retry(max_retries=5, retry_on_deadlock=True)
     def update_account(self, context, user_id, project_id=None,
                        **data):
         """Update account"""
@@ -1381,8 +929,8 @@ class Connection(api.Connection):
 
             account = model_query(
                 context,
-            sa_models.Account,
-            session=session).filter_by(user_id=user_id).one()
+                sa_models.Account,
+                session=session).filter_by(user_id=user_id).one()
             params = dict(balance=balance,
                           updated_at=datetime.datetime.utcnow())
             if balance < 0:
@@ -1397,50 +945,6 @@ class Connection(api.Connection):
                 filters,
                 params,
                 exception.AccountUpdateFailed())
-
-    @require_admin_context
-    @oslo_db_api.wrap_db_retry(max_retries=5, retry_on_deadlock=True,
-                               retry_on_request=True)
-    def deduct_account(self, context, user_id, deduct=True, **data):
-        """Deduct account by user_id"""
-
-        session = get_session()
-        with session.begin():
-            if deduct:
-                account = session.query(sa_models.Account).\
-                    filter_by(user_id=user_id).\
-                    one()
-
-                params = dict(balance=account.balance - data['money'])
-                filters = params.keys()
-                filters.append('user_id')
-
-                self._compare_and_swap(model_query(context,
-                                                   sa_models.Account,
-                                                   session=session),
-                                       account, filters, params,
-                                       exception.AccountUpdatetFailed())
-
-            deduct = sa_models.Deduct(req_id=data['reqId'],
-                                      deduct_id=uuidutils.generate_uuid(),
-                                      type=data.get('type'),
-                                      money=data['money'],
-                                      remark=data.get('remark'),
-                                      order_id=data['extData']['order_id'])
-            session.add(deduct)
-        return self._row_to_db_deduct_model(deduct)
-
-    @require_admin_context
-    def get_deduct(self, context, req_id):
-        """Get deduct by deduct id"""
-
-        try:
-            deduct = get_session().query(sa_models.Deduct).\
-                filter_by(req_id=req_id).\
-                one()
-        except NoResultFound:
-            raise exception.DeductNotFound(req_id=req_id)
-        return self._row_to_db_deduct_model(deduct)
 
     def set_charged_orders(self, context, user_id, project_id=None):
         """Set owed orders to charged"""
@@ -1465,8 +969,7 @@ class Connection(api.Connection):
                 order.date_time = None
                 order.charged = True
 
-    @oslo_db_api.wrap_db_retry(max_retries=5, retry_on_deadlock=True,
-                               retry_on_request=True)
+    @oslo_db_api.wrap_db_retry(max_retries=5, retry_on_deadlock=True)
     def reset_charged_orders(self, context, order_ids):
         session = get_session()
         with session.begin():
@@ -1561,8 +1064,7 @@ class Connection(api.Connection):
         return self._row_to_db_account_model(account_ref).__dict__
 
     @require_admin_context
-    @oslo_db_api.wrap_db_retry(max_retries=5, retry_on_deadlock=True,
-                               retry_on_request=True)
+    @oslo_db_api.wrap_db_retry(max_retries=5, retry_on_deadlock=True)
     def freeze_balance(self, context, project_id, total_price):
         session = get_session()
         with session.begin():
@@ -1589,8 +1091,7 @@ class Connection(api.Connection):
         return self._row_to_db_account_model(account)
 
     @require_admin_context
-    @oslo_db_api.wrap_db_retry(max_retries=5, retry_on_deadlock=True,
-                               retry_on_request=True)
+    @oslo_db_api.wrap_db_retry(max_retries=5, retry_on_deadlock=True)
     def unfreeze_balance(self, context, project_id, total_price):
         session = get_session()
         with session.begin():
@@ -1685,8 +1186,7 @@ class Connection(api.Connection):
 
         return (self._row_to_db_project_model(p) for p in projects)
 
-    @oslo_db_api.wrap_db_retry(max_retries=5, retry_on_deadlock=True,
-                               retry_on_request=True)
+    @oslo_db_api.wrap_db_retry(max_retries=5, retry_on_deadlock=True)
     def change_billing_owner(self, context, project_id, user_id):
         session = get_session()
         with session.begin():
@@ -1774,8 +1274,7 @@ class Connection(api.Connection):
             return False
 
     @require_admin_context
-    @oslo_db_api.wrap_db_retry(max_retries=5, retry_on_deadlock=True,
-                               retry_on_request=True)
+    @oslo_db_api.wrap_db_retry(max_retries=5, retry_on_deadlock=True)
     def fix_order(self, context, order_id):
         session = get_session()
         with session.begin():
@@ -1807,176 +1306,8 @@ class Connection(api.Connection):
             account.balance += more_fee
             account.consumption -= more_fee
 
-    def get_precharges(self, context, user_id=None, limit=None, offset=None,
-                       sort_key=None, sort_dir=None):
-        query = model_query(context, sa_models.PreCharge).\
-            filter_by(deleted=False)
-
-        if user_id:
-            query = query.filter_by(user_id=user_id)
-
-        result = paginate_query(context, sa_models.PreCharge,
-                                limit=limit, offset=offset,
-                                sort_key=sort_key, sort_dir=sort_dir,
-                                query=query)
-
-        return (self._row_to_db_precharge_model(r) for r in result)
-
-    def get_precharges_count(self, context, user_id=None):
-        query = model_query(context, sa_models.PreCharge,
-                            func.count(sa_models.PreCharge.id).
-                            label('count')).filter_by(deleted=False)
-
-        if user_id:
-            query = query.filter_by(user_id=user_id)
-
-        try:
-            result = query.one()
-        except (NoResultFound):
-            return 0
-        return result.count
-
-    @oslo_db_api.wrap_db_retry(max_retries=5, retry_on_deadlock=True,
-                               retry_on_request=True)
-    def delete_precharge(self, context, code):
-        session = get_session()
-        with session.begin():
-            try:
-                precharge = model_query(
-                    context, sa_models.PreCharge, session=session).\
-                    filter_by(deleted=False).\
-                    filter_by(code=code).one()
-            except NoResultFound:
-                raise exception.PreChargeNotFound(precharge_code=code)
-            precharge.deleted = True
-            precharge.deleted_at = datetime.datetime.utcnow()
-
-    def get_precharge_by_code(self, context, code):
-        try:
-            precharge = model_query(context, sa_models.PreCharge).\
-                filter_by(deleted=False).\
-                filter_by(code=code).one()
-        except NoResultFound:
-            LOG.warning('The precharge %s not found', code)
-            raise exception.PreChargeNotFound(precharge_code=code)
-        return self._row_to_db_precharge_model(precharge)
-
-    @oslo_db_api.wrap_db_retry(max_retries=5, retry_on_deadlock=True,
-                               retry_on_request=True)
-    def dispatch_precharge(self, context, code, remarks=None):
-        session = get_session()
-        with session.begin():
-            try:
-                precharge = model_query(
-                    context, sa_models.PreCharge, session=session).\
-                    filter_by(deleted=False).\
-                    filter_by(code=code).one()
-            except NoResultFound:
-                raise exception.PreChargeNotFound(precharge_code=code)
-
-            if precharge.used:
-                raise exception.PreChargeHasUsed(precharge_code=code)
-
-            if precharge.dispatched:
-                raise exception.PreChargeHasDispatched(precharge_code=code)
-
-            precharge.dispatched = True
-            precharge.remarks = remarks
-
-        return self._row_to_db_precharge_model(precharge)
-
-    @oslo_db_api.wrap_db_retry(max_retries=5, retry_on_deadlock=True,
-                               retry_on_request=True)
-    def use_precharge(self, context, code, user_id=None, project_id=None):
-        session = get_session()
-        with session.begin():
-            try:
-                precharge = session.query(sa_models.PreCharge).\
-                    filter_by(deleted=False).\
-                    filter_by(code=code).one()
-            except NoResultFound:
-                raise exception.PreChargeNotFound(precharge_code=code)
-
-            if precharge.used:
-                raise exception.PreChargeHasUsed(precharge_code=code)
-
-            now = datetime.datetime.utcnow()
-            if precharge.expired_at < now:
-                raise exception.PreChargeHasExpired(precharge_code=code)
-
-            try:
-                account = model_query(
-                    context, sa_models.Account, session=session).\
-                    filter_by(user_id=user_id).\
-                    one()
-            except NoResultFound:
-                raise exception.AccountNotFound(user_id=user_id)
-
-            account.balance += precharge.price
-            if account.balance >= 0:
-                account.owed = False
-
-            # Add charge records
-            charge_time = datetime.datetime.utcnow()
-            charge = sa_models.Charge(charge_id=uuidutils.generate_uuid(),
-                                      user_id=account.user_id,
-                                      project_id=account.project_id,
-                                      domain_id=account.domain_id,
-                                      value=precharge.price,
-                                      type='coupon',
-                                      come_from="coupon",
-                                      charge_time=charge_time,
-                                      operator=account.user_id,
-                                      remarks='coupon')
-            session.add(charge)
-
-            # Update precharge
-            precharge.used = True
-            precharge.user_id = user_id
-            precharge.project_id = project_id
-            precharge.domain_id = account.domain_id
-
-        return self._row_to_db_precharge_model(precharge)
-
     @require_context
-    @oslo_db_api.wrap_db_retry(max_retries=5, retry_on_deadlock=True,
-                               retry_on_request=True)
-    def fix_resource(self, context, resource_id):
-        session = get_session()
-        with session.begin():
-            query = session.query(sa_models.Order).\
-                filter_by(resource_id=resource_id)
-            orders = query.all()
-
-            if len(orders) > 2:
-                return
-
-            for order in orders:
-                if order.status != 'deleted':
-                    new_order = order
-                else:
-                    old_order = order
-
-            old_order.status = new_order.status
-            old_order.unit_price = new_order.unit_price
-            old_order.unit = new_order.unit
-
-            if new_order.total_price > 0:
-                account = session.query(sa_models.Account).\
-                    filter_by(project_id=new_order.project_id).one()
-                account.balance += new_order.total_price
-                account.consumption -= new_order.total_price
-
-            bills = session.query(sa_models.Bill).\
-                filter_by(order_id=new_order.order_id)
-            for bill in bills:
-                session.delete(bill)
-
-            session.delete(new_order)
-
-    @require_context
-    @oslo_db_api.wrap_db_retry(max_retries=5, retry_on_deadlock=True,
-                               retry_on_request=True)
+    @oslo_db_api.wrap_db_retry(max_retries=5, retry_on_deadlock=True)
     def fix_stopped_order(self, context, order_id):
         session = get_session()
         with session.begin():
@@ -2034,8 +1365,7 @@ class Connection(api.Connection):
             account.balance += more_fee
             account.consumption -= more_fee
 
-    @oslo_db_api.wrap_db_retry(max_retries=5, retry_on_deadlock=True,
-                               retry_on_request=True)
+    @oslo_db_api.wrap_db_retry(max_retries=5, retry_on_deadlock=True)
     def transfer_money(self, cxt, data):
         session = get_session()
         with session.begin():
@@ -2086,61 +1416,7 @@ class Connection(api.Connection):
                                            remarks=remarks)
             session.add(charge_from)
 
-    @oslo_db_api.wrap_db_retry(max_retries=5, retry_on_deadlock=True,
-                               retry_on_request=True)
-    def set_accounts_salesperson(self, context, user_id_list, sales_id):
-        session = get_session()
-        with session.begin():
-            # make sure sales_id is a valid account
-            try:
-                session.query(sa_models.Account).filter_by(
-                    user_id=sales_id).with_lockmode('read').one()
-            except (NoResultFound):
-                LOG.warning(
-                    'Salesperson %s does not have an account', sales_id)
-                raise exception.AccountNotFound(user_id=sales_id)
-
-            for user_id in user_id_list:
-                try:
-                    account = session.query(sa_models.Account).filter_by(
-                        user_id=user_id).one()
-                    account.sales_id = sales_id
-                except (NoResultFound):
-                    LOG.warning('Account %s does not exist', user_id)
-                    raise exception.AccountNotFound(user_id=user_id)
-
-    def get_salesperson_amount(self, context, sales_id):
-        session = get_session()
-        query = session.query(
-            sa_models.Account,
-            func.count(sa_models.Account.id).label('count'),
-            func.sum(sa_models.Account.consumption).label('sales_amount'))
-        query = query.filter_by(sales_id=sales_id)
-        try:
-            result = query.one()
-        except (NoResultFound):
-            # This salesperson has no customer
-            return 0, 0
-
-        return result.count, result.sales_amount
-
-    def get_salesperson_customer_accounts(self, context, sales_id,
-                                          offset=None, limit=None):
-        session = get_session()
-        query = session.query(sa_models.Account).filter_by(
-            sales_id=sales_id)
-        try:
-            result = paginate_query(
-                context, sa_models.Account, query=query,
-                offset=offset, limit=limit
-            )
-            return (self._row_to_db_account_model(a) for a in result)
-        except (NoResultFound):
-            # This salesperson has no customer
-            return ()
-
-    @oslo_db_api.wrap_db_retry(max_retries=5, retry_on_deadlock=True,
-                               retry_on_request=True)
+    @oslo_db_api.wrap_db_retry(max_retries=5, retry_on_deadlock=True)
     def switch_auto_renew(self, context, order_id, action):
         session = get_session()
         with session.begin():

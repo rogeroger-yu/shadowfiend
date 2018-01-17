@@ -1,5 +1,5 @@
-# -*- coding: utf-8 -*-
-# Copyright 2017 Openstack Foundation.
+# Copyright 2015 OpenStack Foundation
+# All Rights Reserved.
 #
 #    Licensed under the Apache License, Version 2.0 (the "License"); you may
 #    not use this file except in compliance with the License. You may obtain
@@ -13,21 +13,13 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-from oslo_config import cfg
-from oslo_db import options
+"""Tests for manipulating Accounts via the DB API"""
 
-from shadowfiend.common import paths
-
-
-sql_opts = [
-    cfg.StrOpt('mysql_engine',
-               default='InnoDB',
-               help='MySQL engine to use.')
-]
-
-_DEFAULT_SQL_CONNECTION = ('sqlite:///' +
-                           paths.state_path_def('shadowfiend.sqlite'))
+from shadowfiend.tests.unit.db import base
+from shadowfiend.tests.unit.db import utils
 
 
-cfg.CONF.register_opts(sql_opts, 'database')
-options.set_defaults(cfg.CONF, _DEFAULT_SQL_CONNECTION)
+class DbAccountTestCase(base.DbTestCase):
+
+    def test_create_account(self):
+        utils.create_test_account(self.context)

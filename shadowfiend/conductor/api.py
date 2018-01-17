@@ -25,7 +25,7 @@ from shadowfiend.common import service as rpc_service
 
 class API(rpc_service.API):
     def __init__(self, transport=None, context=None, topic=None):
-        if topic is None:
+        if topic is None or 'fake-topic':
             cfg.CONF.import_opt('topic', 'shadowfiend.conductor.config',
                                 group='conductor')
         super(API, self).__init__(transport, context,

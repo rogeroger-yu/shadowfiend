@@ -68,6 +68,7 @@ class AdminAccount(APIBase):
     domain_id = wtypes.text
     sales_id = wtypes.text
     owed = bool
+    deleted = bool
     inviter = wtypes.text
     owed_at = wtypes.text
     created_at = wtypes.text

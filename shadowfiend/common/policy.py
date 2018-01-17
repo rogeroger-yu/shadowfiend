@@ -75,9 +75,9 @@ def check_is_admin(roles):
     return _ENFORCER.enforce('context_is_admin', target, credentials)
 
 
-def check_policy(context, action):
+def check_policy(context, rule, *args, **kwargs):
     target = {
         "project_id": context.project_id,
         "user_id": context.user_id
     }
-    enforce(context, action, target)
+    enforce(context, rule, target, *args, **kwargs)

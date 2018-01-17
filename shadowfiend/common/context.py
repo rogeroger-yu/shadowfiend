@@ -33,7 +33,8 @@ class RequestContext(context.RequestContext):
                  project_name=None, project_id=None, roles=None,
                  is_admin=False, read_only=False, show_deleted=False,
                  request_id=None, trust_id=None, auth_token_info=None,
-                 all_tenants=False, password=None, **kwargs):
+                 all_tenants=False, password=None, is_domain_owner=None,
+                 **kwargs):
         """Stores several additional request parameters:
 
         :param domain_id: The ID of the domain.
@@ -66,6 +67,7 @@ class RequestContext(context.RequestContext):
         self.trust_id = trust_id
         self.all_tenants = all_tenants
         self.password = password
+        self.is_domain_owner = is_domain_owner
 
     def to_dict(self):
         value = super(RequestContext, self).to_dict()

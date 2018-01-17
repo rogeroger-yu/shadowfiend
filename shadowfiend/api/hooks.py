@@ -16,7 +16,6 @@
 from oslo_config import cfg
 from pecan import hooks
 
-from shadowfiend.api import acl
 from shadowfiend.common import context
 from shadowfiend.conductor import api as conductor_api
 from shadowfiend.processor import api as processor_api
@@ -77,8 +76,8 @@ class ContextHook(hooks.PecanHook):
             project_id=project_id,
             domain_id=domain_id,
             domain_name=domain_name,
-            is_admin=acl.context_is_admin(headers),
-            is_domain_owner=acl.context_is_domain_owner(headers),
+            # is_admin=acl.context_is_admin(headers),
+            # is_domain_owner=acl.context_is_domain_owner(headers),
             roles=roles)
 
 

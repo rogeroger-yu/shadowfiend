@@ -192,7 +192,7 @@ class Worker(object):
                 resources = self.gnocchi_fetcher.get_resources(_service,
                                                                tenant_id)
                 for resource in resources:
-                    result = service_client.drop_resource(resource)
+                    service_client.drop_resource(resource)
             except Exception as e:
                 LOG.warning("Error while drop resource: %s: %s" %
                             (resource, e))

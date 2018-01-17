@@ -51,7 +51,6 @@ class ExistAccountController(rest.RestController):
 
     def __init__(self, user_id):
         self._id = user_id
-        self.gnocchi_fetcher = fetcher.GnocchiFetcher()
 
     def _account(self, user_id=None):
         _id = user_id or self._id
@@ -77,12 +76,10 @@ class ExistAccountController(rest.RestController):
         lacv = int(CONF.limited_accountant_charge_value)
         if data.value < -lacv or data.value > lacv:
             raise exception.InvalidChargeValue(value=data.value)
-        operator = HOOK.context.user_id
         try:
             charge = HOOK.conductor_rpcapi.charge_account(
                 HOOK.context,
                 self._id,
-                operator=operator,
                 **data.as_dict())
 
         except exception.NotAuthorized as e:
@@ -98,8 +95,8 @@ class ExistAccountController(rest.RestController):
     @wsexpose(models.AdminAccount)
     def get(self):
         """Get this account."""
-        user_id = acl.get_limited_to_user(
-            HOOK.headers, 'account:get') or self._id
+        policy.check_policy(HOOK.context, "account:get")
+        user_id = self._id
         return models.AdminAccount(**self._account(user_id=user_id))
 
     @wsexpose(None)
@@ -172,10 +169,11 @@ class ExistAccountController(rest.RestController):
         """Get the price per day and the remaining days."""
 
         policy.check_policy(HOOK.context, "account:estimate")
+        _gnocchi_fetcher = fetcher.GnocchiFetcher()
 
         user_id = self._id
         account = self._account(user_id=user_id)
-        price_per_hour = self.gnocchi_fetcher.get_current_consume(
+        price_per_hour = _gnocchi_fetcher.get_current_consume(
             HOOK.context.project_id)
 
         if price_per_hour == 0:
@@ -290,10 +288,12 @@ class AccountController(rest.RestController):
         if _correct:
             return ExistAccountController(user_id), remainder
 
-    @wsexpose(None, body=models.AdminAccount)
+    @wsexpose(None, body=models.AdminAccount, status_code=202)
     def post(self, data):
         """Create a new account."""
-        policy.check_policy(HOOK.context, "account:post")
+        policy.check_policy(HOOK.context,
+                            "account:post",
+                            action="account:post")
         try:
             account = data.as_dict()
             response = HOOK.conductor_rpcapi.create_account(HOOK.context,
@@ -305,7 +305,8 @@ class AccountController(rest.RestController):
     @wsexpose(models.AdminAccounts, bool, int, int, wtypes.text)
     def get_all(self, owed=None, limit=None, offset=None, duration=None):
         """Get this account."""
-        policy.check_policy(HOOK.context, "account:all")
+        policy.check_policy(HOOK.context, "account:all", action="account:all")
+        owed = False
 
         if limit and limit < 0:
             raise exception.InvalidParameterValue(err="Invalid limit")
@@ -325,10 +326,7 @@ class AccountController(rest.RestController):
                 limit=limit,
                 offset=offset,
                 active_from=active_from)
-            count = HOOK.conductor_rpcapi.get_accounts_count(
-                HOOK.context,
-                owed=owed,
-                active_from=active_from)
+            count = len(accounts)
         except exception.NotAuthorized as e:
             LOG.error('Failed to get all accounts')
             raise exception.NotAuthorized()
