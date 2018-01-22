@@ -135,9 +135,13 @@ class TestDeleteAccount(api_base.FunctionalTest):
 
     def test_delete_account(self):
         account = conductor_utils.create_test_account(self)
-        with mock.patch.object(conductor_api, 'get_account',
-                               conductor_utils.get_test_account):
-            response = self.get_json('/accounts/%s' % account.user_id,
-                                     expect_errors=True)
-            self.assertEqual(404, response.status_int)
-            self.assertEqual('application/json', response.content_type)
+
+        with mock.patch.object(conductor_api, 'delete_account',
+                               conductor_utils.delete_test_account):
+            self.delete('/accounts/%s' % account.user_id)
+            with mock.patch.object(conductor_api, 'get_account',
+                                   conductor_utils.get_test_account):
+                response = self.get_json('/accounts/%s' % account.user_id,
+                                         expect_errors=True)
+                self.assertEqual(404, response.status_int)
+                self.assertEqual('application/json', response.content_type)

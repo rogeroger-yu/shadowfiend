@@ -214,8 +214,8 @@ class OrdersController(rest.RestController):
         data = []
 
         adata = (u"过滤条件: 资源类型: %s, 资源状态: %s,"
-                 "用户ID: %s, 项目ID: %s, 区域: %s, 起始时间: %s,"
-                 "结束时间: %s" %
+                 u"用户ID: %s, 项目ID: %s, 区域: %s, 起始时间: %s,"
+                 u"结束时间: %s" %
                  (type, status, user_id, project_id,
                   region_id, start_time, end_time),
                  "", "", "", "", "", "", "", "", "", "", "")
