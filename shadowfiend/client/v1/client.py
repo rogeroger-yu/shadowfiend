@@ -101,12 +101,6 @@ class Client(object):
         resp, body = self.client.get('/orders/%s' % order_id)
         return body
 
-    def get_order_by_resource_id(self, resource_id):
-        params = dict(resource_id=resource_id)
-        resp, body = self.client.get('/orders/resource',
-                                     params=params)
-        return body
-
     def get_orders(self, status=None, project_id=None, owed=None,
                    region_id=None, type=None, bill_methods=None):
         params = dict(status=status,

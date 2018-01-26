@@ -51,7 +51,7 @@ service_opts = [
     cfg.BoolOpt('periodic_enable',
                 default=True,
                 help='Enable periodic tasks'),
-    cfg.BoolOpt('enable_owe',
+    cfg.BoolOpt('owe_enable',
                 default=True,
                 help='Enable the logic of owe'),
     cfg.IntOpt('periodic_fuzzy_delay',
@@ -59,10 +59,6 @@ service_opts = [
                help='Range of seconds to randomly delay when starting the'
                     ' periodic task scheduler to reduce stampeding.'
                     ' (Disable by setting to 0)'),
-    cfg.IntOpt('periodic_interval_max',
-               default=60,
-               help='Max interval size between periodic tasks execution in '
-                    'seconds.'),
     cfg.IntOpt('periodic_interval_max',
                default=60,
                help='Max interval size between periodic tasks execution in '
@@ -94,13 +90,11 @@ class Service(service.Service):
         self.binary = binary
         self.topic = topic
         self.manager = manager
-        self.binary = binary
         self.periodic_enable = periodic_enable
         self.periodic_fuzzy_delay = periodic_fuzzy_delay
         self.periodic_interval_max = periodic_interval_max
 
     def start(self):
-        # access_policy = dispatcher.DefaultRPCAccessPolicy
         serializer = rpc.RequestContextSerializer(
             objects_base.ShadowfiendObjectSerializer())
         transport = messaging.get_transport(cfg.CONF,
@@ -113,18 +107,7 @@ class Service(service.Service):
                                                 executor='eventlet')
 
         self._server.start()
-        LOG.debug("Creating RPC server for service %s", self.topic)
-
-        # if self.periodic_enable:
-        #     if self.periodic_fuzzy_delay:
-        #         initial_delay = random.randint(0, self.periodic_fuzzy_delay)
-        #     else:
-        #         initial_delay = None
-
-        #     self.tg.add_dynamic_timer(self.periodic_tasks,
-        #                               initial_delay=initial_delay,
-        #                               periodic_interval_max=
-        #                               self.periodic_interval_max)
+        LOG.debug("RPC server for service %s created", self.topic)
 
     def stop(self):
         if self._server:
@@ -201,6 +184,3 @@ class API(object):
 
     def _cast(self, method, *args, **kwargs):
         self._client.cast(self._context, method, *args, **kwargs)
-
-    def echo(self, message):
-        self._cast('echo', message=message)

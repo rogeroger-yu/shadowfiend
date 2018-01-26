@@ -59,7 +59,7 @@ class Summaries(APIBase):
 
 
 class AdminAccount(APIBase):
-    """Account Detail for a tenant"""
+    """Account Detail for a project"""
     balance = float
     consumption = float
     level = int

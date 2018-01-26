@@ -53,7 +53,7 @@ service_map = {'computer': nova,
 def set_context(func):
     @functools.wraps(func)
     def handler(self, ctx):
-        ctx = context.make_admin_context(all_tenants=True)
+        ctx = context.make_admin_context(all_projects=True)
         context.set_ctx(ctx)
         func(self, ctx)
         context.set_ctx(None)
@@ -63,7 +63,6 @@ def set_context(func):
 class ProcessorService(rpc_service.Service):
     def __init__(self, *args, **kwargs):
         super(ProcessorService, self).__init__(*args, **kwargs)
-        # self.fetch = service.fetcher
 
     def start(self, *args, **kwargs):
         super(ProcessorService, self).start(*args, **kwargs)
@@ -96,22 +95,27 @@ class ProcessorPeriodTasks(periodic_task.PeriodicTasks):
             str(uuid.uuid4()).encode('ascii'))
         self.coord.start()
 
-    def _lock(self, tenant_id):
-        lock_name = b"shadowfiend-" + str(tenant_id).encode('ascii')
+    def _lock(self, project_id):
+        lock_name = b"shadowfiend-" + str(project_id).encode('ascii')
         return self.coord.get_lock(lock_name)
 
-    def _check_state(self, tenant_id):
+    def _check_state(self, project_id):
         timestamp = self.gnocchi_fetcher.get_state(
-            tenant_id, 'shadowfiend', 'top')
+            project_id, 'shadowfiend', 'top')
         LOG.debug("timestamp is :%s" % timestamp)
-        if not timestamp:
+        if not timestamp and CONF.processor.historical_expenses:
             LOG.debug("There is no shadowfiend timestamp"
                       "Initialization from cloudkitty's first record")
             timestamp = self.gnocchi_fetcher.get_state(
-                tenant_id, 'cloudkitty', 'bottom')
+                project_id, 'cloudkitty', 'bottom')
+        elif not timestamp:
+            LOG.debug("There is no shadowfiend timestamp"
+                      "Initialization from current time")
+            now_ts = timeutils.utcnow_ts()
+            timestamp = now_ts - (now_ts % 3600)
 
         top_stamp = self.gnocchi_fetcher.get_state(
-            tenant_id, 'cloudkitty', 'top')
+            project_id, 'cloudkitty', 'top')
         next_timestamp = timestamp + CONF.processor.process_period
         if next_timestamp < top_stamp:
             return next_timestamp
@@ -120,52 +124,47 @@ class ProcessorPeriodTasks(periodic_task.PeriodicTasks):
     @periodic_task.periodic_task(run_immediately=True, spacing=process_period)
     @set_context
     def Primary_Period(self, ctx):
-        LOG.info("************************")
-        LOG.info("Processing the correspondence between tenants and accounts")
+        # fetch rating enable projects
+        rate_projects = self.keystone_fetcher.get_rate_projects()
+        LOG.info("projects are %s" % str(rate_projects))
 
-        # fetch rating enable tenants
-        rate_tenants = self.keystone_fetcher.get_rate_tenants()
-        LOG.info("Tenants are %s" % str(rate_tenants))
-
-        while len(rate_tenants):
-            for rate_tenant in rate_tenants[:]:
-                lock = self._lock(rate_tenant)
+        while len(rate_projects):
+            for rate_project in rate_projects[:]:
+                lock = self._lock(rate_project)
                 if lock.acquire(blocking=False):
-                    begin = self._check_state(rate_tenant)
+                    begin = self._check_state(rate_project)
                     if not begin:
-                        rate_tenants.remove(rate_tenant)
+                        rate_projects.remove(rate_project)
                     else:
-                        worker = Worker(ctx, rate_tenant, begin)
+                        worker = Worker(ctx, rate_project, begin)
                         worker.run()
                     lock.release()
                 self.coord.heartbeat()
-            # NOTE(sheeprine): Slow down looping if all tenants are
+            # NOTE(sheeprine): Slow down looping if all projects are
             # being processed
             eventlet.sleep(1)
 
-        # check every tenant's timestamp is prepared, push into thread queue
-
+        # check every project's timestamp is prepared, push into thread queue
         LOG.info("Process successfully in this period")
 
 
 class Worker(object):
-    def __init__(self, ctx, tenant_id, begin):
+    def __init__(self, context, project_id, begin):
+        self.context = context
+        self.project_id = project_id
         self.begin = begin
-        self.context = ctx
-        self.tenant_id = tenant_id
-        # self.period = CONF.processor.process_period
         self.gnocchi_fetcher = service.fetcher.GnocchiFetcher()
         self.keystone_fetcher = service.fetcher.KeystoneFetcher()
         self.conductor = conductor_api.API()
 
     def run(self):
         period_cost = self.gnocchi_fetcher.get_current_consume(
-            self.tenant_id, self.begin)
-        rate_user_id = self.keystone_fetcher.get_rate_user(self.tenant_id)
+            self.project_id, self.begin)
+        rate_user_id = self.keystone_fetcher.get_rate_user(self.project_id)
         if rate_user_id == []:
             LOG.error("There is no billing owner in you project: %s "
-                      "Please contact the administrator" % self.tenant_id)
-            raise ValueError("Not Found rate_user_id")
+                      "Please contact the administrator" % self.project_id)
+            continue
         account = self.conductor.get_account(
             self.context, rate_user_id)
         balance = account['balance']
@@ -173,23 +172,23 @@ class Worker(object):
             owed_offset = (timeutils.utcnow_ts -
                            timeutils.str2ts(account['owed_at']))
             if (owed_offset <= account['level'] * TS_DAY or
-                    account['level'] == 9):
+                    account['level'] == 9 or not CONF.owe_enable):
                 pass
             else:
-                self.owed_action(self.tenant_id)
+                self.owed_action(self.project_id)
         else:
             self.conductor.update_account(
                 self.context,
                 user_id=rate_user_id,
                 balance=balance - period_cost)
-        self.gnocchi_fetcher.set_state(self.tenant_id, self.begin)
+        self.gnocchi_fetcher.set_state(self.project_id, self.begin)
 
-    def owed_action(self, tenant_id):
+    def owed_action(self, project_id):
         # get billing resource
         for _service in CONF.processor.services:
             try:
                 resources = self.gnocchi_fetcher.get_resources(_service,
-                                                               tenant_id)
+                                                               project_id)
                 for resource in resources:
                     service_map[_service].drop_resource(_service,
                                                         resource['id'])

@@ -41,11 +41,6 @@ class Handler(object):
         LOG.debug('get order: Received message from RPC.')
         return cls.dbapi.get_order(context, kwargs['order_id'])
 
-    def get_order_by_resource_id(cls, context, **kwargs):
-        LOG.debug('get order by resource id: Received message from RPC.')
-        return cls.dbapi.get_order_by_resource_id(
-            context, kwargs['resource_id'])
-
     def update_order(cls, context, **kwargs):
         LOG.debug('update order: Received message from RPC.')
         return cls.dbapi.update_order(

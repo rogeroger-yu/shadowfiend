@@ -39,34 +39,10 @@ class ExistOrderController(rest.RestController):
 
     _custom_actions = {
         'close': ['PUT'],
-        'activate_auto_renew': ['PUT'],
-        'switch_auto_renew': ['PUT'],
-        'renew': ['PUT'],
-        'resize_resource': ['POST'],
-        'delete_resource': ['POST'],
-        'stop_resource': ['POST'],
-        'start_resource': ['POST'],
-        'restore_resource': ['POST'],
     }
 
     def __init__(self, order_id):
         self._id = order_id
-
-    def _order(self, start_time=None, end_time=None,
-               limit=None, offset=None):
-
-        self.conn = pecan.request.db_conn
-        try:
-            bills = self.conn.get_bills_by_order_id(HOOK.context,
-                                                    order_id=self._id,
-                                                    start_time=start_time,
-                                                    end_time=end_time,
-                                                    limit=limit,
-                                                    offset=offset)
-        except Exception:
-            LOG.error('Order(%s)\'s bills not found' % self._id)
-            raise exception.OrderBillsNotFound(order_id=self._id)
-        return bills
 
     @wsexpose(models.Order)
     def get(self):
@@ -123,27 +99,8 @@ class ExistOrderController(rest.RestController):
             raise exception.InvalidParameterValue(err=err)
 
 
-class ResourceController(rest.RestController):
-    """Order related to resource."""
-
-    @wsexpose(models.Order, wtypes.text)
-    def get(self, resource_id):
-        order = HOOK.conductor_rpcapi.get_order_by_resource_id(
-            HOOK.context,
-            resource_id)
-        return models.Order.from_db_model(order)
-
-
 class OrderController(rest.RestController):
     """The controller of resources."""
-
-    # summary = SummaryController()
-    # count = CountController()
-    # active = ActiveController()
-    # stopped = StoppedOrderCountController()
-    # reset = ResetOrderController()
-
-    resource = ResourceController()
 
     @pecan.expose()
     def _lookup(self, order_id, *remainder):

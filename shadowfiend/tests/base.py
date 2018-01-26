@@ -26,7 +26,6 @@ import pecan
 import testscenarios
 
 from shadowfiend.common import context as shadowfiend_context
-from shadowfiend.common import keystone as shadowfiend_keystone
 from shadowfiend.tests import conf_fixture
 from shadowfiend.tests import fake_notifier
 from shadowfiend.tests import policy_fixture
@@ -64,8 +63,6 @@ class TestCase(base.BaseTestCase):
             }
         }
 
-        trustee_domain_id = '12345678-9012-3456-7890-123456789abc'
-
         self.context = shadowfiend_context.RequestContext(
             auth_token_info=token_info,
             project_id='fake_project',
@@ -73,9 +70,6 @@ class TestCase(base.BaseTestCase):
             is_admin=True)
 
         self.global_mocks = {}
-
-        self.keystone_client = shadowfiend_keystone.KeystoneClientV3(
-            self.context)
 
         self.policy = self.useFixture(policy_fixture.PolicyFixture())
 
@@ -102,18 +96,8 @@ class TestCase(base.BaseTestCase):
 
         self.global_mocks['shadowfiend.common.context.make_context'] = p
 
-        q = mock.patch.object(shadowfiend_keystone.KeystoneClientV3,
-                              'trustee_domain_id',
-                              return_value=trustee_domain_id)
-
-        self.global_mocks[('shadowfiend.common.keystone.'
-                           'KeystoneClientV3.trustee_domain_id')] = q
-
         self.mock_make_context = p.start()
         self.addCleanup(p.stop)
-
-        self.mock_make_trustee_domain_id = q.start()
-        self.addCleanup(q.stop)
 
         self.useFixture(conf_fixture.ConfFixture())
         self.useFixture(fixtures.NestedTempfile())

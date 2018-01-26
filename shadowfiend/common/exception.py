@@ -57,27 +57,8 @@ class SSLError(ShadowfiendException):
     """The request ssl error"""
 
 
-class PreChargeException(ShadowfiendException):
-    """PreCharge failed"""
-
-
 class InvalidOutputFormat(ShadowfiendException):
     message = "Invalid output format: %(output_format)s"
-    code = 400
-
-
-class PreChargeHasDispatched(ShadowfiendException):
-    message = "Precharge %(precharge_code)s has been dispatched"
-    code = 400
-
-
-class PreChargeHasUsed(ShadowfiendException):
-    message = "Precharge %(precharge_code)s has been used"
-    code = 400
-
-
-class PreChargeHasExpired(ShadowfiendException):
-    message = "Precharge %(precharge_code)s has been expired"
     code = 400
 
 
@@ -94,10 +75,6 @@ class InvalidDeductParameter(ShadowfiendException):
 class Overlimit(ShadowfiendException):
     code = 423
     message = "%(api)s is called overlimited"
-
-
-class PreChargeOverlimit(Overlimit):
-    message = "Precharge has reached the maxium number"
 
 
 class NotAuthorized(ShadowfiendException):
@@ -128,20 +105,6 @@ class MissingRequiredParams(ShadowfiendException):
 
 class DBError(ShadowfiendException):
     message = "Error in DB backend: %(reason)s"
-
-
-class DuplicatedProduct(ShadowfiendException):
-    message = "Duplicated Product: %(reason)s"
-
-
-class DuplicatedDeduct(ShadowfiendException):
-    message = "Duplicated deduct req_id: %(req_id)s"
-    code = 400
-
-
-class DeductError(ShadowfiendException):
-    message = "Deduct Failed: account: %(user_id)s,\
-                money: %(money)s, req_id: %(req_id)s"
 
 
 class GetExternalBalanceFailed(ShadowfiendException):
@@ -214,16 +177,8 @@ class AccountUpdateFailed(ShadowfiendException):
     message = "Account update failed"
 
 
-class DeductNotFound(NotFound):
-    message = "Deduct req_id %(req_id)s not found"
-
-
 class AccountByProjectNotFound(NotFound):
     message = "Account %(project_id)s could not be found"
-
-
-class PreChargeNotFound(NotFound):
-    message = "Precharge %(precharge_code)s not found"
 
 
 class AccountCreateFailed(ShadowfiendException):
@@ -273,18 +228,6 @@ class NotSufficientFrozenBalance(ShadowfiendException):
     code = 402
 
 
-class BillCreateFailed(ShadowfiendException):
-    message = "Fail to create bill for the order: %(order_id)s"
-
-
-class BillUpdateFailed(ShadowfiendException):
-    message = "Fail to update bill for the order: %(order_id)s"
-
-
-class BillCloseFailed(ShadowfiendException):
-    message = "Fail to close bill for the order: %(order_id)s"
-
-
 class OrderBillsNotFound(NotFound):
     message = "Order %(order_id)s bills could not be found"
 
@@ -301,10 +244,6 @@ class OrderUpdateFailed(ShadowfiendException):
     message = "Order update failed"
 
 
-class SubscriptionUpdateFailed(ShadowfiendException):
-    message = "Subscription update failed"
-
-
 class ProductIdNotFound(NotFound):
     message = "Product %(product_id)s could not be found"
 
@@ -313,48 +252,8 @@ class ProductNameNotFound(NotFound):
     message = "Product %(product_name)s could not be found"
 
 
-class SalesIdNotFound(NotFound):
-    message = "Sales whose sales_id is %(sales_id)s could not be found"
-
-
-class MarkerNotFound(NotFound):
-    message = "Marker %(marker)s could not be found"
-
-
-class LatestBillNotFound(NotFound):
-    message = "Can't find latest bill for order: %s(order_id)s"
-
-
-class OwedBillsNotFound(NotFound):
-    message = "Can't find owed bills for order: %s(order_id)s"
-
-
-class DiskNotFound(NotFound):
-    message = "No disk at %(location)s"
-
-
-class DriverNotFound(NotFound):
-    message = "Failed to load driver %(driver_name)s."
-
-
-class ImageNotFound(NotFound):
-    message = "Image %(image_id)s could not be found."
-
-
-class HostNotFound(NotFound):
-    message = "Host %(host)s could not be found."
-
-
-class FileNotFound(NotFound):
-    message = "File %(file_path)s could not be found."
-
-
 class NoValidHost(NotFound):
     message = "No valid host was found. %(reason)s"
-
-
-class InstanceNotFound(NotFound):
-    message = "Instance %(instance)s could not be found."
 
 
 class GlanceConnectionFailed(ShadowfiendException):

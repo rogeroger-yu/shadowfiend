@@ -24,7 +24,7 @@ from shadowfiend.api import acl
 from shadowfiend.api.controllers.v1 import models
 from shadowfiend.common import exception
 from shadowfiend.common import policy
-from shadowfiend.common import utils as shadowutils
+from shadowfiend.common import timeutils
 from shadowfiend.processor.service import fetcher
 from shadowfiend.services import keystone as ks_client
 
@@ -319,7 +319,7 @@ class AccountController(rest.RestController):
         if offset and offset < 0:
             raise exception.InvalidParameterValue(err="Invalid offset")
 
-        duration = shadowutils.normalize_timedelta(duration)
+        duration = timeutils.normalize_timedelta(duration)
         if duration:
             active_from = datetime.datetime.utcnow() - duration
         else:

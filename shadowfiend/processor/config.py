@@ -50,6 +50,10 @@ SERVICE_OPTS = [
                          'ratelimit.gw',
                          'loadbalancer'],
                 help=('Services to monitor.')),
+    cfg.BoolOpt('historical_expenses',
+                default=False,
+                help="Whether to record the historical cost"),
+
 ]
 
 

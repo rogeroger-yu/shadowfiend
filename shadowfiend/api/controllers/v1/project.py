@@ -132,22 +132,22 @@ class ProjectController(rest.RestController):
                 user_id = HOOK.context.user_id
 
             try:
-                user_projects = HOOK.conductor_rpcapi.get_user_projects(
+                relations = HOOK.conductor_rpcapi.get_relation(
                     HOOK.context,
                     user_id=user_id)
             except Exception as e:
                 LOG.exception('Fail to get all projects')
                 raise exception.DBError(reason=e)
 
-            if not user_projects:
+            if not relations:
                 LOG.warn('User %s has no payed projects' % user_id)
                 return []
 
-            project_ids = [up['project_id'] for up in user_projects]
+            project_ids = [up['project_id'] for up in relations]
 
             projects = self._list_keystone_projects()
 
-            for u, p in itertools.product(user_projects, projects):
+            for u, p in itertools.product(relations, projects):
                 if u['project_id'] == p.id:
                     up = models.UserProject(
                         user_id=user_id,
@@ -176,8 +176,7 @@ class ProjectController(rest.RestController):
 
             try:
                 sf_projects = (HOOK.conductor_rpcapi.
-                               get_projects_by_project_ids(
-                                   HOOK.context, project_ids))
+                               get_projects(HOOK.context, project_ids))
             except Exception as e:
                 LOG.exception('Fail to get all projects')
                 raise exception.DBError(reason=e)

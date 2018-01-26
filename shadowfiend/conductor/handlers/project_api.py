@@ -50,10 +50,10 @@ class Handler(object):
         LOG.debug('Conductor Function: delete_project.')
         cls.dbapi.delete_project(context, kwargs['project_id'])
 
-    def get_user_projects(cls, context, **kwargs):
+    def get_relation(cls, context, **kwargs):
         LOG.debug('Conductor Function: get_user_projects.')
-        return cls.dbapi.get_user_projects(context, **kwargs)
+        return cls.dbapi.get_relation(context, **kwargs)
 
-    def get_projects_by_project_ids(cls, context, **kwargs):
-        LOG.debug('Conductor Function: get_projects_by_project_ids.')
-        return cls.dbapi.get_projects_by_project_ids(context, **kwargs)
+    def get_projects(cls, context, **kwargs):
+        LOG.debug('Conductor Function: get_projects.')
+        return cls.dbapi.get_projects(context, **kwargs)

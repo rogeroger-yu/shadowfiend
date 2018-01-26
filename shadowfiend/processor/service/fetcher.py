@@ -30,10 +30,6 @@ from gnocchiclient import exceptions as gexceptions
 from shadowfiend.common import timeutils
 from shadowfiend.services.gnocchi import GnocchiClient
 from shadowfiend.services.keystone import KeystoneClient
-# services test fetcher
-# from shadowfiend.services.cinder import CinderClient
-# from shadowfiend.services.nova import NovaClient
-# from shadowfiend.services.glance import GlanceClient
 from shadowfiend.services.neutron import NeutronClient
 
 
@@ -49,41 +45,41 @@ class KeystoneFetcher(KeystoneClient):
     def __init__(self):
         super(KeystoneFetcher, self).__init__()
 
-    def get_rate_tenants(self):
+    def get_rate_projects(self):
         keystone_version = discover.normalize_version_number('3')
         auth_dispatch = {(3,): ('project', 'projects', 'list'),
                          (2,): ('tenant', 'tenants', 'roles_for_user')}
         for auth_version, auth_version_mapping in six.iteritems(auth_dispatch):
             if discover.version_match(auth_version, keystone_version):
-                return self._do_get_tenants(auth_version_mapping)
+                return self._do_get_projects(auth_version_mapping)
         msg = "Keystone version you've specified is not supported"
         raise exceptions.VersionNotAvailable(msg)
 
-    def _do_get_tenants(self, auth_version_mapping):
-        # tenant_attr: project,tenant_attrs: projects,role_func: list
-        tenant_attr, tenants_attr, role_func = auth_version_mapping
-        tenant_list = getattr(self.ks_client, tenants_attr).list()
+    def _do_get_projects(self, auth_version_mapping):
+        # project_attr: project,project_attrs: projects,role_func: list
+        project_attr, projects_attr, role_func = auth_version_mapping
+        project_list = getattr(self.ks_client, projects_attr).list()
         user_list = getattr(self.ks_client.users, 'list')(
-            **{tenant_attr: tenant_list[0]})
+            **{project_attr: project_list[0]})
         for user in user_list:
             if user.__dict__['name'] == 'cloudkitty':
                 rating_user = user.id
                 break
-        for tenant in tenant_list[:]:
+        for project in project_list[:]:
             roles = getattr(self.ks_client.roles, role_func)(
                 **{'user': rating_user,
-                   tenant_attr: tenant})
+                   project_attr: project})
             if 'rating' not in [role.name for role in roles]:
-                tenant_list.remove(tenant)
-        return [tenant.id for tenant in tenant_list]
+                project_list.remove(project)
+        return [project.id for project in project_list]
 
-    def get_rate_user(self, tenant_id):
+    def get_rate_user(self, project_id):
         role_id = getattr(self.ks_client.roles, 'list')(
             **{'name': 'billing_owner',
-               'project': tenant_id})[0].id
+               'project': project_id})[0].id
         role_assign = getattr(self.ks_client.role_assignments, 'list')(
             **{'role': role_id,
-               'project': tenant_id})
+               'project': project_id})
         return (role_assign[0].user['id'] if role_assign != [] else
                 role_assign)
 
@@ -97,8 +93,8 @@ class GnocchiFetcher(GnocchiClient):
         super(GnocchiFetcher, self).__init__()
         self._period = CONF.processor.cloudkitty_period
 
-    def set_state(self, tenant_id, state):
-        query = {"=": {"project_id": tenant_id}}
+    def set_state(self, project_id, state):
+        query = {"=": {"project_id": project_id}}
         # get resource_id, if not, create it
         resources = self.gnocchi_client.resource.search(
             resource_type=SHADOWFIEND_STATE_RESOURCE,
@@ -106,12 +102,12 @@ class GnocchiFetcher(GnocchiClient):
             limit=1)
         if not resources:
             # NOTE(sheeprine): We don't have the user id information and we are
-            # doing rating on a per tenant basis. Put garbage in it
+            # doing rating on a per project basis. Put garbage in it
             resource = self.gnocchi_client.resource.create(
                 resource_type=SHADOWFIEND_STATE_RESOURCE,
                 resource={'id': uuid.uuid4(),
                           'user_id': None,
-                          'project_id': tenant_id})
+                          'project_id': project_id})
             resource_id = resource['id']
         else:
             resource_id = resources[0]['id']
@@ -134,8 +130,8 @@ class GnocchiFetcher(GnocchiClient):
             [{'timestamp': timeutils.ts2dt(state).isoformat(),
              'value': 1}])
 
-    def get_state(self, tenant_id, state_type, order_type):
-        query = {"=": {"project_id": tenant_id}}
+    def get_state(self, project_id, state_type, order_type):
+        query = {"=": {"project_id": project_id}}
         resources = self.gnocchi_client.resource.search(
             resource_type=('%s_state' % state_type),
             query=query,
@@ -143,7 +139,7 @@ class GnocchiFetcher(GnocchiClient):
 
         if not resources:
             # NOTE(sheeprine): We don't have the user id information and we are
-            # doing rating on a per tenant basis. Put garbage in it
+            # doing rating on a per project basis. Put garbage in it
             LOG.warning("There is no % state resource" % state_type)
         else:
             state_resource_id = resources[0]['id']
@@ -167,12 +163,12 @@ class GnocchiFetcher(GnocchiClient):
                 result = r[-1][0] if order_type == 'top' else r[0][0]
                 return timeutils.dt2ts(parser.parse(result))
 
-    def get_current_consume(self, tenant_id, start_stamp=None):
+    def get_current_consume(self, project_id, start_stamp=None):
         if not start_stamp:
-            _stamp = self.get_state(tenant_id, 'shadowfiend', 'top')
+            _stamp = self.get_state(project_id, 'shadowfiend', 'top')
             start_stamp = (_stamp if _stamp is not None else
-                           self.get_state(tenant_id, 'cloudkitty', 'bottom'))
-        query = {"=": {"project_id": tenant_id}}
+                           self.get_state(project_id, 'cloudkitty', 'bottom'))
+        query = {"=": {"project_id": project_id}}
 
         def aggregate(start_stamp, period, query, granularity):
             return self.gnocchi_client.metric.aggregation(
@@ -206,9 +202,9 @@ class GnocchiFetcher(GnocchiClient):
             total_price += measure[2] if measure[1] == _granularity else 0
         return total_price
 
-    def get_resources(self, tenant_id, service):
-        if tenant_id:
-            query = {"=": {"project_id": tenant_id}}
+    def get_resources(self, project_id, service):
+        if project_id:
+            query = {"=": {"project_id": project_id}}
         else:
             query = {">=": {"started_at": "2010-01-01"}}
         try:

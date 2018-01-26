@@ -13,13 +13,12 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+import six
+import uuid
+
 from decimal import Decimal
 from decimal import ROUND_HALF_UP
 from shadowfiend.common import constants as const
-
-import datetime
-import six
-import uuid
 
 STATE_MAPPING = {
     'ACTIVE': const.STATE_RUNNING,
@@ -52,10 +51,6 @@ def transform_status(status):
         return const.STATE_ERROR
 
 
-def format_datetime(dt):
-    return '%s %s.000000' % (dt[:10], dt[11:19])
-
-
 def true_or_false(abool):
     if isinstance(abool, bool):
         return abool
@@ -66,20 +61,6 @@ def true_or_false(abool):
         if abool == 'false':
             return False
     raise ValueError("should be bool or true/false string")
-
-
-def normalize_timedelta(duration):
-    if not duration:
-        return
-    unit = duration[-1]
-    value = duration[:-1]
-    if unit == 'm':
-        return datetime.timedelta(minutes=float(value))
-    if unit == 'h':
-        return datetime.timedelta(hours=float(value))
-    if unit == 'd':
-        return datetime.timedelta(days=float(value))
-    raise ValueError("unsupport time unit")
 
 
 def is_uuid_like(val):

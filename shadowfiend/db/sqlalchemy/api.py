@@ -291,21 +291,6 @@ class Connection(api.Connection):
                                updated_at=row.updated_at)
 
     @staticmethod
-    def _row_to_db_subscription_model(row):
-        return db_models.Subscription(subscription_id=row.subscription_id,
-                                      type=row.type,
-                                      product_id=row.product_id,
-                                      unit_price=row.unit_price,
-                                      quantity=row.quantity,
-                                      order_id=row.order_id,
-                                      user_id=row.user_id,
-                                      project_id=row.project_id,
-                                      region_id=row.region_id,
-                                      domain_id=row.domain_id,
-                                      created_at=row.created_at,
-                                      updated_at=row.updated_at)
-
-    @staticmethod
     def _row_to_db_account_model(row):
         return db_models.Account(user_id=row.user_id,
                                  domain_id=row.domain_id,
@@ -609,19 +594,6 @@ class Connection(api.Connection):
                                    exception.OrderUpdateFailed())
         self._transfer(order)
         return self._row_to_db_order_model(order).__dict__
-
-    @require_context
-    def get_order_by_resource_id(self, context, resource_id):
-        query = model_query(context, sa_models.Order).\
-            filter_by(resource_id=resource_id)
-        try:
-            ref = query.one()
-        except NoResultFound:
-            LOG.warning('The order of the resource(%s) not found', resource_id)
-            raise exception.ResourceOrderNotFound(resource_id=resource_id)
-
-        self._transfer(ref)
-        return self._row_to_db_order_model(ref).__dict__
 
     @require_context
     def get_order(self, context, order_id):
@@ -1128,8 +1100,8 @@ class Connection(api.Connection):
         return self._row_to_db_project_model(project_ref).__dict__
 
     @require_context
-    def get_user_projects(self, context, user_id=None,
-                          limit=None, offset=None):
+    def get_relation(self, context, user_id=None,
+                     limit=None, offset=None):
         # get user's all historical projects
         query = model_query(context, sa_models.UsrPrjRelation)
         if user_id:
@@ -1162,29 +1134,27 @@ class Connection(api.Connection):
         return result
 
     @require_context
-    def get_projects_by_project_ids(self, context, project_ids):
-        result = get_session().query(sa_models.Project).\
-            filter(sa_models.Project.project_id.in_(project_ids)).\
-            all()
+    def get_projects(self, context, project_ids=None,
+                     user_id=None, active_from=None):
+        if not project_ids:
+            query = model_query(context, sa_models.Project)
+            if user_id:
+                query = query.filter_by(user_id=user_id)
+            if active_from:
+                query = query.filter(sa_models.Project.updated_at >
+                                     active_from)
+            projects = query.all()
+            return (self._row_to_db_project_model(p) for p in projects)
+        else:
+            result = get_session().query(sa_models.Project).\
+                filter(sa_models.Project.project_id.in_(project_ids)).\
+                all()
 
-        projects = []
-        for r in result:
-            self._transfer(r)
-            projects.append(self._row_to_db_project_model(r).__dict__)
-        return projects
-
-    @require_context
-    def get_projects(self, context, user_id=None, active_from=None):
-        query = model_query(context, sa_models.Project)
-
-        if user_id:
-            query = query.filter_by(user_id=user_id)
-        if active_from:
-            query = query.filter(sa_models.Project.updated_at > active_from)
-
-        projects = query.all()
-
-        return (self._row_to_db_project_model(p) for p in projects)
+            projects = []
+            for r in result:
+                self._transfer(r)
+                projects.append(self._row_to_db_project_model(r).__dict__)
+            return projects
 
     @oslo_db_api.wrap_db_retry(max_retries=5, retry_on_deadlock=True)
     def change_billing_owner(self, context, project_id, user_id):

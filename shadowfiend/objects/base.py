@@ -30,8 +30,8 @@ class ShadowfiendObject(base.VersionedObject):
     as appropriate.
     """
 
-    OBJ_SERIAL_NAMESPACE = 'Shadowfiend_object'
-    OBJ_PROJECT_NAMESPACE = 'Shadowfiend'
+    OBJ_SERIAL_NAMESPACE = 'shadowfiend_object'
+    OBJ_PROJECT_NAMESPACE = 'shadowfiend'
 
     def as_dict(self):
         return {k: getattr(self, k)

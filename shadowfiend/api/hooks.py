@@ -18,7 +18,6 @@ from pecan import hooks
 
 from shadowfiend.common import context
 from shadowfiend.conductor import api as conductor_api
-from shadowfiend.processor import api as processor_api
 
 CONF = cfg.CONF
 CONF.import_opt('auth_uri', 'keystonemiddleware.auth_token',
@@ -86,6 +85,4 @@ class RPCHook(hooks.PecanHook):
 
     def before(self, state):
         state.request.conductor_rpcapi = conductor_api.API(
-            context=state.request.context)
-        state.request.processor_rpcapi = processor_api.API(
             context=state.request.context)

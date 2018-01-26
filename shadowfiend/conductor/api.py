@@ -48,17 +48,20 @@ class API(rpc_service.API):
         kwargs = dict(project_id=project_id)
         return self._call(context, 'get_project', **kwargs)
 
+    def get_projects(self, context, project_ids=None,
+                     user_id=None, active_from=None):
+        kwargs = dict(project_ids=project_ids,
+                      user_id=user_id,
+                      active_from=active_from)
+        return self._call(context, 'get_projects', **kwargs)
+
     def delete_project(self, context, project_id):
         kwargs = dict(project_id=project_id)
         return self._call(context, 'delete_project', **kwargs)
 
-    def get_user_projects(self, context, user_id):
+    def get_relation(self, context, user_id):
         kwargs = dict(user_id=user_id)
-        return self._call(context, 'get_user_projects', **kwargs)
-
-    def get_projects_by_project_ids(self, context, project_ids):
-        kwargs = dict(project_ids=project_ids)
-        return self._call(context, 'get_projects_by_project_ids', **kwargs)
+        return self._call(context, 'get_relation', **kwargs)
 
     def get_account(self, context, user_id):
         kwargs = dict(user_id=user_id)
@@ -132,10 +135,6 @@ class API(rpc_service.API):
     def get_order(self, context, order_id):
         kwargs = dict(order_id=order_id)
         return self._call(context, 'get_order', **kwargs)
-
-    def get_order_by_resource_id(self, context, resource_id):
-        kwargs = dict(resource_id=resource_id)
-        return self._call(context, 'get_order_by_resource_id', **kwargs)
 
     def update_order(self, context, order_id, change_to,
                      cron_time, change_order_status, first_change_to):

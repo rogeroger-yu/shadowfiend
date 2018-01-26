@@ -17,7 +17,6 @@ from oslo_config import cfg
 from oslo_middleware import cors
 
 from shadowfiend.common import rpc
-# from shadowfiend.db.sqlalchemy import api as sqlalchemy_api
 from shadowfiend.common import version
 
 
@@ -31,9 +30,6 @@ def parse_args(argv, default_config_files=None, configure_db=True,
              default_config_files=default_config_files)
 
     rpc.init(cfg.CONF)
-
-    # if configure_db:
-    #     sqlalchemy_api.configure(CONF)
 
 
 def set_middleware_defaults():

@@ -26,14 +26,6 @@ from sqlalchemy.ext.declarative import declarative_base
 
 from shadowfiend.common import timeutils
 
-sql_opts = [
-    cfg.StrOpt('mysql_engine',
-               default='InnoDB',
-               help='MySQL engine')
-]
-
-cfg.CONF.register_opts(sql_opts)
-
 
 def table_args():
     engine_name = urlparse.urlparse(cfg.CONF.database.connection).scheme

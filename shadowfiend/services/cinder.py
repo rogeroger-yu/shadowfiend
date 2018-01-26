@@ -19,12 +19,7 @@ from oslo_config import cfg
 from oslo_log import log
 
 from cinderclient import client as cinder_client
-from cinderclient.exceptions import NotFound
-from shadowfiend.common import constants as const
-from shadowfiend.common import timeutils
-from shadowfiend.common import utils
 from shadowfiend.services import BaseClient
-from shadowfiend.services import Resource
 
 
 LOG = log.getLogger(__name__)
@@ -50,20 +45,6 @@ class CinderClient(BaseClient):
             session=self.session,
             auth_url=self.auth.auth_url)
 
-    def volume_get(self, volume_id, region_name=None):
-        try:
-            volume = self.cinder_client.volumes.get(volume_id)
-        except NotFound:
-            return None
-        status = utils.transform_status(volume.status)
-        return Volume(id=volume.id,
-                      name=volume.display_name,
-                      status=status,
-                      original_status=volume.status,
-                      resource_type=const.RESOURCE_VOLUME,
-                      attachments=volume.attachments,
-                      size=volume.size)
-
     def volume_delete(self, volume_id, region_name=None):
         search_opts = {'all_tenants': 1, 'volume_id': volume_id}
         snaps = self.cinder_client.volume_snapshots.list(
@@ -88,69 +69,3 @@ class CinderClient(BaseClient):
 
     def snapshot_delete(self, snap_id, region_name=None):
         self.cinder_client.volume_snapshots.delete(snap_id)
-
-    def snapshot_get(self, snapshot_id, region_name=None):
-        try:
-            sp = self.cinder_client.volume_snapshots.get(snapshot_id)
-        except NotFound:
-            return None
-        status = utils.transform_status(sp.status)
-        return Snapshot(id=sp.id,
-                        name=sp.display_name,
-                        size=sp.size,
-                        status=status,
-                        original_status=sp.status,
-                        resource_type=const.RESOURCE_SNAPSHOT)
-
-
-class Snapshot(Resource):
-    def to_message(self):
-        msg = {
-            'event_type': 'snapshot.create.end.again',
-            'payload': {
-                'snapshot_id': self.id,
-                'display_name': self.name,
-                'volume_size': self.size,
-                'user_id': self.user_id,
-                'tenant_id': self.project_id
-            },
-            'timestamp': utils.format_datetime(timeutils.strtime())
-        }
-        return msg
-
-    def to_env(self):
-        return dict(HTTP_X_USER_ID=self.user_id,
-                    HTTP_X_PROJECT_ID=self.project_id)
-
-    def to_body(self):
-        body = {}
-        body[self.resource_type] = dict(snapshot_id=self.id)
-        return body
-
-
-class Volume(Resource):
-    def to_message(self):
-        msg = {
-            'event_type': 'volume.create.end.again',
-            'payload': {
-                'volume_id': self.id,
-                'display_name': self.name,
-                'size': self.size,
-                'volume_type': self.type,
-                'user_id': self.user_id,
-                'tenant_id': self.project_id
-            },
-            'timestamp': utils.format_datetime(timeutils.strtime())
-        }
-        return msg
-
-    def to_env(self):
-        """:returns: TODO"""
-
-        return dict(HTTP_X_USER_ID=self.user_id,
-                    HTTP_X_PROJECT_ID=self.project_id)
-
-    def to_body(self):
-        body = {}
-        body[self.resource_type] = dict(volume_type=self.type, size=self.size)
-        return body
