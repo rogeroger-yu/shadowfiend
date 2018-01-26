@@ -33,7 +33,7 @@ from stevedore import extension
 
 # ISO 8601 extended time format with microseconds
 _ISO8601_TIME_FORMAT_SUBSECOND = '%Y-%m-%dT%H:%M:%S.%f'
-_ISO8601_TIME_FORMAT = '%Y-%m-%dT%H:%M:%S'
+_ISO8601_TIME_FORMAT = '%Y-%m-%dT%H:%M:%SZ'
 PERFECT_TIME_FORMAT = _ISO8601_TIME_FORMAT_SUBSECOND
 
 
@@ -99,6 +99,10 @@ def nl2utc(timestamp):
 def str2ts(datetime):
     return time.mktime(
         time.strptime(datetime, _ISO8601_TIME_FORMAT))
+
+
+def ts2str(timestamp):
+    return time.strftime(_ISO8601_TIME_FORMAT, time.localtime(timestamp))
 
 
 def strtime(at=None, fmt=PERFECT_TIME_FORMAT):

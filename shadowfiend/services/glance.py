@@ -29,9 +29,10 @@ from shadowfiend.services import Resource
 LOG = log.getLogger(__name__)
 
 
-def get_client(service):
+def drop_resource(service, resource_id):
+    _glance_client = GlanceClient()
     if service == 'image':
-        return GlanceClient()
+        _glance_client.delete_image(resource_id)
 
 
 class GlanceClient(BaseClient):

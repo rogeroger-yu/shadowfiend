@@ -187,12 +187,12 @@ class Worker(object):
     def owed_action(self, tenant_id):
         # get billing resource
         for _service in CONF.processor.services:
-            service_client = service_map[_service].get_client()
             try:
                 resources = self.gnocchi_fetcher.get_resources(_service,
                                                                tenant_id)
                 for resource in resources:
-                    service_client.drop_resource(resource)
+                    service_map[_service].drop_resource(_service,
+                                                        resource['id'])
             except Exception as e:
                 LOG.warning("Error while drop resource: %s: %s" %
                             (resource, e))

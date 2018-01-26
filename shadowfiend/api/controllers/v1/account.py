@@ -70,7 +70,8 @@ class ExistAccountController(rest.RestController):
     @wsexpose(models.Charge, wtypes.text, body=models.Charge)
     def put(self, data):
         """Charge the account."""
-        policy.check_policy(HOOK.context, "account:charge")
+        policy.check_policy(HOOK.context, "account:charge",
+                            action="account:charge")
 
         # check accountant charge value
         lacv = int(CONF.limited_accountant_charge_value)
@@ -95,14 +96,15 @@ class ExistAccountController(rest.RestController):
     @wsexpose(models.AdminAccount)
     def get(self):
         """Get this account."""
-        policy.check_policy(HOOK.context, "account:get")
+        policy.check_policy(HOOK.context, "account:get", action="account:get")
         user_id = self._id
         return models.AdminAccount(**self._account(user_id=user_id))
 
     @wsexpose(None)
     def delete(self):
         """Delete the account including the projects that belong to it."""
-        policy.check_policy(HOOK.context, "account:delete")
+        policy.check_policy(HOOK.context, "account:delete",
+                            action="account:delete")
         try:
             HOOK.conductor_rpcapi.delete_account(HOOK.context,
                                                  self._id)
@@ -113,7 +115,8 @@ class ExistAccountController(rest.RestController):
     @wsexpose(models.UserAccount, int)
     def level(self, level):
         """Update the account's level."""
-        policy.check_policy(HOOK.context, "account:level")
+        policy.check_policy(HOOK.context, "account:level",
+                            action="account:level")
 
         if not isinstance(level, int) or level < 0 or level > 9:
             raise exception.InvalidParameterValue(err="Invalid Level")
@@ -131,7 +134,8 @@ class ExistAccountController(rest.RestController):
     def charges(self, type=None, start_time=None,
                 end_time=None, limit=None, offset=None):
         """Get this account's charge records."""
-        policy.check_policy(HOOK.context, "charges:get")
+        policy.check_policy(HOOK.context, "charges:get",
+                            action="account:charges")
 
         if limit and limit < 0:
             raise exception.InvalidParameterValue(err="Invalid limit")
@@ -168,7 +172,8 @@ class ExistAccountController(rest.RestController):
     def estimate(self):
         """Get the price per day and the remaining days."""
 
-        policy.check_policy(HOOK.context, "account:estimate")
+        policy.check_policy(HOOK.context, "account:estimate",
+                            action="account:estimate")
         _gnocchi_fetcher = fetcher.GnocchiFetcher()
 
         user_id = self._id
@@ -209,7 +214,8 @@ class ChargeController(rest.RestController):
             sort_key='created_at', sort_dir='desc'):
         """Get all charges of all account."""
 
-        policy.check_policy(HOOK.context, "charges:all")
+        policy.check_policy(HOOK.context, "charges:all",
+                            action="charges:all")
 
         if limit and limit < 0:
             raise exception.InvalidParameterValue(err="Invalid limit")

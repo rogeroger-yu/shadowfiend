@@ -46,14 +46,10 @@ class ExistAccountController(rest.RestController):
         if data.value < -lacv or data.value > lacv:
             raise exception.InvalidChargeValue(value=data.value)
 
-        # remarks = data.remarks if data.remarks != wsme.Unset else None
-        operator = HOOK.context.user_id
-
         try:
-            charge = HOOK.conductor_rpcapi.update_account(
+            charge = HOOK.conductor_rpcapi.charge_account(
                 HOOK.context,
                 self._id,
-                operator=operator,
                 **data.as_dict())
 
         except exception.NotAuthorized as e:

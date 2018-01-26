@@ -96,9 +96,8 @@ class API(rpc_service.API):
                       **data)
         return self._call(context, 'update_account', **kwargs)
 
-    def charge_account(self, context, user_id, operator, **data):
+    def charge_account(self, context, user_id, **data):
         kwargs = dict(user_id=user_id,
-                      operator=operator,
                       **data)
         return self._call(context, 'charge_account', **kwargs)
 

@@ -13,6 +13,8 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+import time
+
 from oslo_config import cfg
 from oslo_log import log
 
@@ -31,9 +33,12 @@ CONF = cfg.CONF
 SERVICE_CLIENT_OPTS = 'service_client'
 
 
-def get_client(service):
-    if service in ['volume.volume', 'volume.snapshot']:
-        return CinderClient()
+def drop_resource(service, resource_id):
+    _volume_client = CinderClient()
+    if service == 'volume.volume':
+        _volume_client.volume_delete(resource_id)
+    elif service == 'volume.snapshot':
+        _volume_client.snapshot_delete(resource_id)
 
 
 class CinderClient(BaseClient):
@@ -58,6 +63,31 @@ class CinderClient(BaseClient):
                       resource_type=const.RESOURCE_VOLUME,
                       attachments=volume.attachments,
                       size=volume.size)
+
+    def volume_delete(self, volume_id, region_name=None):
+        search_opts = {'all_tenants': 1, 'volume_id': volume_id}
+        snaps = self.cinder_client.volume_snapshots.list(
+            detailed=False,
+            search_opts=search_opts)
+        for snap in snaps:
+            try:
+                self.cinder_client.volume_snapshots.delete(snap)
+            except Exception:
+                pass
+        volume = self.volume_get(volume_id, region_name=region_name)
+        for attachment in volume.attachments:
+            try:
+                self.cinder_client.volumes.detach(volume_id,
+                                                  attachment['attachment_id'])
+            except Exception:
+                pass
+
+        # wait 10 seconds to delete this volume
+        time.sleep(10)
+        self.cinder_client.volumes.delete(volume_id)
+
+    def snapshot_delete(self, snap_id, region_name=None):
+        self.cinder_client.volume_snapshots.delete(snap_id)
 
     def snapshot_get(self, snapshot_id, region_name=None):
         try:

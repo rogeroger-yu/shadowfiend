@@ -32,9 +32,10 @@ CONF = cfg.CONF
 SERVICE_CLIENT_OPTS = 'service_client'
 
 
-def get_client(service):
+def drop_resource(service, resource_id):
+    _nova_client = NovaClient()
     if service == 'compute':
-        return NovaClient()
+        _nova_client.server_delete(resource_id)
 
 
 class NovaClient(BaseClient):

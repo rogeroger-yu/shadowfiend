@@ -39,9 +39,12 @@ cfg.CONF.register_opts(OPTS)
 FIPSET_IS_AVAILABLE = None
 
 
-def get_client(service):
-    if service in ['ratelimit.gw', 'ratelimit.fip', 'loadbalancer']:
-        return NeutronClient()
+def drop_resource(service, resource_id):
+    _neutron_client = NeutronClient()
+    if service == 'ratelimit.fip':
+        _neutron_client.delete_fip(resource_id)
+    elif service == 'loadbalancer':
+        _neutron_client.delete_loadbalancer(resource_id)
 
 
 class NeutronClient(BaseClient):
@@ -225,6 +228,9 @@ class NeutronClient(BaseClient):
                 self.neutron_client.delete_network(network['id'])
             except Exception:
                 pass
+
+    def delete_loadbalancer(self, id, region_name=None):
+        self.neutron_client.delete_loadbalancer(id)
 
     def delete_loadbalancers(self, project_id, region_name=None):
         loadbalancers = self.neutron_client.list_loadbalancers(

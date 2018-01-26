@@ -131,7 +131,7 @@ class GnocchiFetcher(GnocchiClient):
         # set state: add measures to gnocchi
         self.gnocchi_client.metric.add_measures(
             metric_id,
-            [{'timestamp': state.isoformat(),
+            [{'timestamp': timeutils.ts2dt(state).isoformat(),
              'value': 1}])
 
     def get_state(self, tenant_id, state_type, order_type):
@@ -173,25 +173,44 @@ class GnocchiFetcher(GnocchiClient):
             start_stamp = (_stamp if _stamp is not None else
                            self.get_state(tenant_id, 'cloudkitty', 'bottom'))
         query = {"=": {"project_id": tenant_id}}
-        try:
-            current_consume = self.gnocchi_client.metric.aggregation(
+
+        def aggregate(start_stamp, period, query, granularity):
+            return self.gnocchi_client.metric.aggregation(
                 start=start_stamp,
-                stop=start_stamp + self._period,
+                stop=((start_stamp + period) if start_stamp is not None
+                      else None),
                 query=query,
                 metrics='total.cost',
                 aggregation='sum',
-                granularity=self._period)
-        except gexceptions.NotAcceptable:
-            return
-        except gexceptions.Unauthorized:
-            return
+                granularity=granularity)
+        try:
+            current_consume = aggregate(
+                start_stamp, self._period, query, self._period)
         except Exception:
-            LOG.exception('Could not get current consume, Makesure '
-                          'your project have correct role relation')
+            current_consume = aggregate(
+                start_stamp, self._period, query, 86400)
         return current_consume[0][2] if current_consume != [] else 0
 
+    def get_resource_price(self, metric_id, start=None, stop=None,
+                           aggregation='sum', granularity=None):
+        _granularity = granularity or self._period
+        measures = self.gnocchi_client.metric.get_measures(
+            metric=metric_id,
+            start=start,
+            stop=stop,
+            aggregation=aggregation,
+            granularity=_granularity,
+            refresh=True)
+        total_price = 0
+        for measure in measures:
+            total_price += measure[2] if measure[1] == _granularity else 0
+        return total_price
+
     def get_resources(self, tenant_id, service):
-        query = {"=": {"project_id": tenant_id}}
+        if tenant_id:
+            query = {"=": {"project_id": tenant_id}}
+        else:
+            query = {">=": {"started_at": "2010-01-01"}}
         try:
             resources = self.gnocchi_client.resource.search(
                 resource_type=service,
