@@ -24,8 +24,10 @@ from pecan import rest
 from shadowfiend.api import acl
 from shadowfiend.api.controllers.v1 import models
 from shadowfiend.common import exception
+from shadowfiend.common import policy
 from shadowfiend.common import utils
 from shadowfiend.services import keystone
+from shadowfiend.processor.service import fetcher
 
 from wsme import types as wtypes
 from wsmeext.pecan import wsexpose
@@ -81,7 +83,7 @@ class ExistOrderController(rest.RestController):
             order = HOOK.conductor_rpcapi.close_order(HOOK.context, self._id)
         except Exception:
             msg = "Fail to close the order %s" % self._id
-            LOG.exception(msg)
+            LOG.error(msg)
             raise exception.DBError(reason=msg)
         return models.Order.from_db_model(order)
 
@@ -101,6 +103,11 @@ class ExistOrderController(rest.RestController):
 
 class OrderController(rest.RestController):
     """The controller of resources."""
+
+    _custom_actions = {
+        'summary': ['GET'],
+        'bills': ['GET'],
+    }
 
     @pecan.expose()
     def _lookup(self, order_id, *remainder):
@@ -204,5 +211,40 @@ class OrderController(rest.RestController):
             HOOK.conductor_rpcapi.update_order(
                 HOOK.context, **data.as_dict())
         except Exception as e:
-            LOG.exception('Fail to update order: %s, for reason %s' %
-                          (data.as_dict(), e))
+            LOG.error('Fail to update order: %s, for reason %s' %
+                      (data.as_dict(), e))
+
+    @wsexpose(wtypes.text, wtypes.text, bool)
+    def summary(self, project_id=None, all_get=False):
+        gnocchi_client = fetcher.GnocchiFetcher()
+        policy.check_policy(HOOK.context, "order:summary",
+                            action="order:summary")
+        if not project_id and not all_get:
+            project_id = HOOK.headers.get("X-Project-Id")
+        if all_get and acl.context_is_admin(HOOK.headers):
+            project_id = None
+        try:
+            result = gnocchi_client.get_summary(
+                project_id)
+        except Exception as e:
+            LOG.error('Exception reason: %s' % e)
+            raise
+        return result
+
+    @wsexpose(wtypes.text, wtypes.text, wtypes.text, int, wtypes.text, bool)
+    def bills(self, resource_type, project_id=None,
+              limit=None, marker=None, all_get=False):
+        gnocchi_client = fetcher.GnocchiFetcher()
+        policy.check_policy(HOOK.context, "order:bills",
+                            action="order:bills")
+        if not project_id and not all_get:
+            project_id = HOOK.headers.get("X-Project-Id")
+        if all_get and acl.context_is_admin(HOOK.headers):
+            project_id = None
+        try:
+            resources = gnocchi_client.get_bills(
+                resource_type, project_id, limit, marker)
+        except Exception as e:
+            LOG.error('Exception reason: %s' % e)
+            raise
+        return resources

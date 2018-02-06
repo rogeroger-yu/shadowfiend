@@ -17,6 +17,9 @@
     "charges:get": "rule:sf_admin or rule:owner",
     "charges:export": "rule:owner",
 
+    "order:summary": "rule:sf_admin or rule:owner",
+    "order:bills": "rule:sf_admin or rule:owner",
+
     "context_is_admin": "",
     "context_is_domain_owner": ""
 }

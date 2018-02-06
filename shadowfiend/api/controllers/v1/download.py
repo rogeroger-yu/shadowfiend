@@ -27,6 +27,7 @@ from wsme import types as wtypes
 from oslo_log import log
 
 from shadowfiend.common import exception
+from shadowfiend.common import policy
 from shadowfiend.api import acl
 from shadowfiend.api.controllers.v1 import models
 from shadowfiend.processor.service import fetcher
@@ -64,11 +65,9 @@ class ChargesController(rest.RestController):
         if offset and offset < 0:
             raise exception.InvalidParameterValue(err="Invalid offset")
 
-        limit_user_id = acl.get_limited_to_user(HOOK.headers,
-                                                'charges:export')
+        policy.check_policy(HOOK.context, "charges:export",
+                            action="charges:export")
 
-        if limit_user_id:
-            user_id = limit_user_id
         if all_get and acl.context_is_admin(HOOK.headers):
             user_id = None
 
@@ -148,13 +147,10 @@ class OrdersController(rest.RestController):
 
         if limit and limit < 0:
             raise exception.InvalidParameterValue(err="Invalid limit")
-        # if marker and len(marker) < 16:
-        #     raise exception.InvalidParameterValue(err="Invalid marker")
 
-        limit_user_id = acl.get_limited_to_user(HOOK.headers,
-                                                'export_orders')
-        if limit_user_id:
-            user_id = limit_user_id
+        policy.check_policy(HOOK.context, "charges:export",
+                            action="charges:export")
+
         if all_get and acl.context_is_admin(HOOK.headers):
             user_id = None
         project_id = (HOOK.headers.get('X-Project-Id')

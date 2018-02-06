@@ -164,7 +164,7 @@ class Worker(object):
         if rate_user_id == []:
             LOG.error("There is no billing owner in you project: %s "
                       "Please contact the administrator" % self.project_id)
-            continue
+            raise ValueError("Not Found rate_user_id")
         account = self.conductor.get_account(
             self.context, rate_user_id)
         balance = account['balance']

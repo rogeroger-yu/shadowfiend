@@ -13,7 +13,7 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-
+import copy
 import six
 import uuid
 
@@ -30,7 +30,6 @@ from gnocchiclient import exceptions as gexceptions
 from shadowfiend.common import timeutils
 from shadowfiend.services.gnocchi import GnocchiClient
 from shadowfiend.services.keystone import KeystoneClient
-from shadowfiend.services.neutron import NeutronClient
 
 
 LOG = log.getLogger(__name__)
@@ -39,6 +38,25 @@ CONF = cfg.CONF
 SERVICE_CLIENT_OPTS = 'service_client'
 SHADOWFIEND_STATE_RESOURCE = 'shadowfiend_state'
 SHADOWFIEND_STATE_METRIC = 'state'
+
+resource_mappings = {
+    'compute': 'instance',
+    'image': 'image',
+    'volume.volume': 'volume',
+    'volume.snapshot': 'volume',
+    'loadbalancer': 'network_lbaas_loadbalancer',
+    'ratelimit.fip': 'ratelimit',
+    'ratelimit.gw': 'ratelimit',
+}
+
+metric_mappings = {
+    'volume.volume': 'volume.size',
+    'volume.snapshot': 'snapshot.size',
+    'ratelimit.fip': 'ratelimit.fip',
+    'ratelimit.gw': 'ratelimit.gw',
+}
+
+START_TIME = timeutils.str2ts("2010-01-01T00:00:00Z")
 
 
 class KeystoneFetcher(KeystoneClient):
@@ -203,10 +221,8 @@ class GnocchiFetcher(GnocchiClient):
         return total_price
 
     def get_resources(self, project_id, service):
-        if project_id:
-            query = {"=": {"project_id": project_id}}
-        else:
-            query = {">=": {"started_at": "2010-01-01"}}
+        query = ({"=": {"project_id": project_id}} if project_id else
+                 {">=": {"started_at": "2010-01-01"}})
         try:
             resources = self.gnocchi_client.resource.search(
                 resource_type=service,
@@ -219,10 +235,106 @@ class GnocchiFetcher(GnocchiClient):
             LOG.exception('Could not get resources')
         return resources
 
+    def get_summary(self, project_id=None):
+        query = ({"and": [{"=": {"project_id": project_id}}]}
+                 if project_id else {">=": {"started_at": "2010-01-01"}})
+        start_at = START_TIME
+        end_at = None
+        try:
+            def _aggregate(resource_type, query, start_at, end_at):
+                return self.gnocchi_client.metric.aggregation(
+                    resource_type=resource_type,
+                    query=query,
+                    start=start_at,
+                    stop=end_at,
+                    metrics='total.cost',
+                    aggregation='sum',
+                    granularity=86400,
+                    needed_overlap=0)
 
-class NeutronFetcher(NeutronClient):
-    def __init__(self):
-        super(NeutronFetcher, self).__init__()
+            def _add_up(orders):
+                total_price = 0
+                for order in orders:
+                    total_price += order[2]
+                return round(total_price, 4)
 
-    def networks_list(self, project_id):
-        return self.network_list(project_id)
+            total_consumption = []
+
+            for _service in CONF.processor.services:
+                orders = _aggregate(resource_type=resource_mappings[_service],
+                                    query=query, start_at=start_at,
+                                    end_at=end_at)
+                total_consumption.append({'total_price': _add_up(orders),
+                                          'type': _service})
+
+            _generic = _aggregate(resource_type='generic',
+                                  query=query,
+                                  start_at=start_at,
+                                  end_at=end_at)
+            total_consumption.append({'total_price': _add_up(_generic),
+                                      'type': 'generic'})
+            return total_consumption
+        except Exception as e:
+            LOG.error("Error resion : %s" % e)
+
+    def get_bills(self, resource_type, project_id=None,
+                  limit=None, marker=None):
+        query = ({"and": [{"=": {"project_id": project_id}}]}
+                 if project_id else {">=": {"started_at": "2010-01-01"}})
+
+        def _add_up(orders):
+            total_price = 0
+            for order in orders:
+                total_price += order[2]
+            return round(total_price, 4)
+
+        def _pagination(resources, limit, marker=None):
+            result = []
+            start_index = None
+            _marker = marker
+            if len(resources) <= limit:
+                return (resources, False, marker)
+            for index, resource in enumerate(resources):
+                if len(result) < limit and resource:
+                    if resource['id'] == _marker or not _marker:
+                        start_index = index + 1
+                        _marker = 1
+                    if index == start_index:
+                        result.append(resource)
+                        start_index += 1
+                else:
+                    return ((result, True, resources[index - 1]['id']) if
+                            resource else (result, False, marker))
+
+        resources = self.gnocchi_client.resource.search(
+            resource_type=resource_mappings[resource_type],
+            query=query)
+
+        if resources == []:
+            return {"total_count": 0, "orders": [], "links": {}}
+
+        for resource in resources[:]:
+            mappings = copy.copy(resource_mappings)
+            if mappings.pop(resource_type) in mappings.values():
+                orders = self.gnocchi_client.metric.get_measures(
+                    metric_mappings[resource_type], resource_id=resource['id'])
+                if orders == []:
+                    resources.remove(resource)
+                    continue
+            try:
+                orders = self.gnocchi_client.metric.get_measures(
+                    'total.cost',
+                    resource_id=resource['id'],
+                    granularity=self._period,
+                    aggregation='sum')
+                resource.update({'total_price': _add_up(orders)})
+            except Exception as e:
+                LOG.error("Error resion: %s, the resource id is % s" %
+                          (e, resource['id']))
+                resource.update({'total_price': 0})
+        result = (_pagination(resources, limit, marker) if limit
+                  else (resources, None))
+
+        return ({"total_count": len(resources),
+                 "orders": result[0],
+                 "links": {"next": result[1], "marker": result[2]}})
