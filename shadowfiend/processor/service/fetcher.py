@@ -51,7 +51,7 @@ resource_mappings = {
 
 metric_mappings = {
     'volume.volume': 'volume.size',
-    'volume.snapshot': 'snapshot.size',
+    'volume.snapshot': 'volume.snapshot.size',
     'ratelimit.fip': 'ratelimit.fip',
     'ratelimit.gw': 'ratelimit.gw',
 }

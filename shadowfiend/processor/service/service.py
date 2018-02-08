@@ -123,7 +123,7 @@ class ProcessorPeriodTasks(periodic_task.PeriodicTasks):
 
     @periodic_task.periodic_task(run_immediately=True, spacing=process_period)
     @set_context
-    def Primary_Period(self, ctx):
+    def primary_period(self, ctx):
         # fetch rating enable projects
         rate_projects = self.keystone_fetcher.get_rate_projects()
         LOG.info("projects are %s" % str(rate_projects))
@@ -167,20 +167,19 @@ class Worker(object):
             raise ValueError("Not Found rate_user_id")
         account = self.conductor.get_account(
             self.context, rate_user_id)
-        balance = account['balance']
-        if account['owed'] and account['owed_at'] is not None:
+        if account['owed']:
             owed_offset = (timeutils.utcnow_ts -
                            timeutils.str2ts(account['owed_at']))
             if (owed_offset <= account['level'] * TS_DAY or
-                    account['level'] == 9 or not CONF.owe_enable):
+                    account['level'] == 9 or not CONF.allow_owe_action):
                 pass
             else:
                 self.owed_action(self.project_id)
-        else:
-            self.conductor.update_account(
-                self.context,
-                user_id=rate_user_id,
-                balance=balance - period_cost)
+        self.conductor.update_account(
+            self.context,
+            user_id=rate_user_id,
+            project_id=self.project_id,
+            consumption=period_cost)
         self.gnocchi_fetcher.set_state(self.project_id, self.begin)
 
     def owed_action(self, project_id):

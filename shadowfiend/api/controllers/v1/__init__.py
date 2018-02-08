@@ -19,7 +19,7 @@ from pecan import rest
 from shadowfiend.api.controllers import base
 from shadowfiend.api.controllers import link
 from shadowfiend.api.controllers.v1 import account
-from shadowfiend.api.controllers.v1 import download
+from shadowfiend.api.controllers.v1 import report
 from shadowfiend.api.controllers.v1 import order
 from shadowfiend.api.controllers.v1 import project
 
@@ -43,9 +43,8 @@ class V1(base.APIBase):
     media_types = [MediaType]
     links = [link.Link]
     accounts = [link.Link]
-    downloads = [link.Link]
+    reports = [link.Link]
     projects = [link.Link]
-    orders = [link.Link]
 
     @staticmethod
     def convert():
@@ -63,20 +62,18 @@ class V1(base.APIBase):
             'application/vnd.openstack.shadowfiend.v1+json')]
         v1.accounts = [link.Link.make_link('self', pecan.request.host_url,
                                            'accounts', '')]
-        v1.downloads = [link.Link.make_link('self', pecan.request.host_url,
-                                            'downloads', '')]
+        v1.reports = [link.Link.make_link('self', pecan.request.host_url,
+                                          'reports', '')]
         v1.projects = [link.Link.make_link('self', pecan.request.host_url,
                                            'projects', '')]
-        v1.orders = [link.Link.make_link('self', pecan.request.host_url,
-                                         'orders', '')]
         return v1
 
 
 class Controller(rest.RestController):
     accounts = account.AccountController()
-    downloads = download.DownloadsController()
-    projects = project.ProjectController()
     orders = order.OrderController()
+    projects = project.ProjectController()
+    reports = report.ReportsController()
 
     @wsexpose(V1)
     def get(self):

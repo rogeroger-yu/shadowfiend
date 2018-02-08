@@ -75,7 +75,7 @@ class ExistAccountController(rest.RestController):
 
         # check accountant charge value
         lacv = int(CONF.limited_accountant_charge_value)
-        if data.value < -lacv or data.value > lacv:
+        if data.value > lacv:
             raise exception.InvalidChargeValue(value=data.value)
         try:
             charge = HOOK.conductor_rpcapi.charge_account(
@@ -108,9 +108,12 @@ class ExistAccountController(rest.RestController):
         try:
             HOOK.conductor_rpcapi.delete_account(HOOK.context,
                                                  self._id)
-        except (exception.NotFound):
+        except exception.NotFound:
             LOG.Warning('Could not find account whose user_id is %s' %
                         self._id)
+        except Exception as e:
+            LOG.error('Fail to delete the account: %s' % self._id)
+            raise exception.DBError(reason=e)
 
     @wsexpose(models.UserAccount, int)
     def level(self, level):
@@ -181,30 +184,26 @@ class ExistAccountController(rest.RestController):
         price_per_hour = _gnocchi_fetcher.get_current_consume(
             HOOK.context.project_id)
 
+        def _estimate(balance, price_per_hour, remaining_day):
+            return models.Estimate(balance=balance,
+                                   price_per_hour=price_per_hour,
+                                   remaining_day=remaining_day)
+
         if price_per_hour == 0:
             if account['balance'] < 0:
-                return models.Estimate(balance=account['balance'],
-                                       price_per_hour=price_per_hour,
-                                       remaining_day=-2)
+                return _estimate(account['balance'], price_per_hour, -2)
             else:
-                return models.Estimate(balance=account['balance'],
-                                       price_per_hour=price_per_hour,
-                                       remaining_day=-1)
+                return _estimate(account['balance'], price_per_hour, -1)
         elif price_per_hour > 0:
             if account['balance'] < 0:
-                return models.Estimate(balance=account['balance'],
-                                       price_per_hour=price_per_hour,
-                                       remaining_day=-2)
+                return _estimate(account['balance'], price_per_hour, -2)
             else:
                 price_per_day = price_per_hour * 24
                 remaining_day = int(account['balance'] / price_per_day)
-
-        return models.Estimate(balance=account['balance'],
-                               price_per_hour=price_per_hour,
-                               remaining_day=remaining_day)
+        return _estimate(account['balance'], price_per_hour, remaining_day)
 
 
-class ChargeController(rest.RestController):
+class ChargesController(rest.RestController):
 
     @wsexpose(models.Charges, wtypes.text, wtypes.text,
               datetime.datetime, datetime.datetime, int, int,
@@ -265,26 +264,10 @@ class ChargeController(rest.RestController):
                                         charges=charges_list)
 
 
-class TransferMoneyController(rest.RestController):
-
-    @wsexpose(None, body=models.TransferMoneyBody)
-    def post(self, data):
-        """Transfer money from one account to another.
-
-        And only the domain owner can do the operation.
-        """
-        is_domain_owner = acl.context_is_domain_owner(HOOK.headers)
-        if not is_domain_owner:
-            raise exception.NotAuthorized()
-
-        HOOK.conductor_rpcapi.transfer_money(HOOK.context, data)
-
-
 class AccountController(rest.RestController):
     """Manages operations on account."""
 
-    charges = ChargeController()
-    transfer = TransferMoneyController()
+    charges = ChargesController()
 
     @pecan.expose()
     def _lookup(self, user_id, *remainder):
@@ -305,8 +288,9 @@ class AccountController(rest.RestController):
             response = HOOK.conductor_rpcapi.create_account(HOOK.context,
                                                             account)
             return response
-        except Exception:
+        except Exception as e:
             LOG.error('Fail to create account: %s' % data.as_dict())
+            raise exception.DBError(reason=e)
 
     @wsexpose(models.AdminAccounts, bool, int, int, wtypes.text)
     def get_all(self, owed=None, limit=None, offset=None, duration=None):
@@ -321,7 +305,7 @@ class AccountController(rest.RestController):
 
         duration = timeutils.normalize_timedelta(duration)
         if duration:
-            active_from = datetime.datetime.utcnow() - duration
+            active_from = timeutils.utcnow() - duration
         else:
             active_from = None
 

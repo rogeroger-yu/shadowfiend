@@ -18,7 +18,19 @@ def get_test_account(**kw):
         'updated_at': kw.get('updated_at'),
         'deleted_at': kw.get('delete_at'),
     }
+    return attrs
 
+
+def get_test_project(**kw):
+    attrs = {
+        'user_id': kw.get('user_id',
+                          ''.join(uuidutils.generate_uuid().split('-'))),
+        'project_id': kw.get('project_id',
+                             ''.join(uuidutils.generate_uuid().split('-'))),
+        'domain_id': kw.get('user_id', 'default'),
+        'consumption': kw.get('consumption', 0.0),
+        'created_at': kw.get('created_at'),
+    }
     return attrs
 
 

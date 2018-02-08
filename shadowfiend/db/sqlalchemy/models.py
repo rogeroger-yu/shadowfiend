@@ -21,7 +21,7 @@ import urlparse
 
 from oslo_config import cfg
 from sqlalchemy import Column, Integer, String
-from sqlalchemy import DateTime, Index, DECIMAL, Boolean
+from sqlalchemy import DateTime, DECIMAL, Boolean
 from sqlalchemy.ext.declarative import declarative_base
 
 from shadowfiend.common import timeutils
@@ -117,45 +117,6 @@ class Charge(Base):
     trading_number = Column(String(255))
     operator = Column(String(64))
     remarks = Column(String(255))
-
-    created_at = Column(DateTime, default=timeutils.utcnow)
-    updated_at = Column(DateTime)
-
-
-class Order(Base):
-    """Order DB Model of SQLAlchemy"""
-
-    __tablename__ = 'order'
-    __table_args__ = (
-        Index('ix_order_order_id', 'order_id'),
-        Index('ix_order_resource_id', 'resource_id'),
-        Index('ix_order_project_id', 'project_id'),
-    )
-
-    id = Column(Integer, primary_key=True)
-
-    order_id = Column(String(255))
-    resource_id = Column(String(255))
-    resource_name = Column(String(255))
-
-    type = Column(String(255))
-    status = Column(String(64))
-
-    unit_price = Column(DECIMAL(20, 4))
-    unit = Column(String(64))
-    total_price = Column(DECIMAL(20, 4))
-    cron_time = Column(DateTime)
-    owed = Column(Boolean, default=False)
-    charged = Column(Boolean, default=False)
-    renew = Column(Boolean, default=False)
-    renew_method = Column(String(64))
-    renew_period = Column(Integer)
-    date_time = Column(DateTime)
-
-    user_id = Column(String(255))
-    project_id = Column(String(255))
-    region_id = Column(String(255))
-    domain_id = Column(String(255))
 
     created_at = Column(DateTime, default=timeutils.utcnow)
     updated_at = Column(DateTime)

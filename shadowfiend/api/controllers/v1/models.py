@@ -22,7 +22,6 @@ class APIBase(wtypes.Base):
     def __init__(self, **kw):
         for key, value in kw.items():
             if isinstance(value, datetime.datetime):
-                # kw[k] = timeutils.isotime(at=value)
                 kw[key] = value
         super(APIBase, self).__init__(**kw)
 
@@ -42,20 +41,6 @@ class APIBase(wtypes.Base):
 
 class Version(APIBase):
     version = wtypes.text
-
-
-class Summary(APIBase):
-    """Summary of one single kind of order."""
-    total_price = float
-    total_count = int
-    order_type = wtypes.text
-
-
-class Summaries(APIBase):
-    """Summary of all kind of orders."""
-    total_price = float
-    total_count = int
-    summaries = [Summary]
 
 
 class AdminAccount(APIBase):
@@ -136,78 +121,7 @@ class Charges(APIBase):
     charges = [Charge]
 
 
-class TransferMoneyBody(APIBase):
-    user_id_to = wtypes.text
-    user_id_from = wtypes.text
-    money = float
-    remarks = wtypes.text
-
-
 class Estimate(APIBase):
     balance = float
     price_per_hour = float
     remaining_day = int
-
-
-class BalanceFrozenResult(APIBase):
-    user_id = wtypes.text
-    project_id = wtypes.text
-    balance = float
-
-
-class BalanceFrozenBody(APIBase):
-    total_price = wsme.wsattr(float, mandatory=True)
-
-
-class OrderPostBody(APIBase):
-    """One single order."""
-    order_id = wtypes.text
-    unit_price = float
-    unit = wtypes.text
-    period = int
-    renew = bool
-    resource_id = wtypes.text
-    resource_name = wtypes.text
-    user_id = wtypes.text
-    project_id = wtypes.text
-    region_id = wtypes.text
-    type = wtypes.text
-    status = wtypes.text
-
-
-class OrderPutBody(APIBase):
-    order_id = wtypes.text
-    change_to = wtypes.text
-    cron_time = wtypes.text
-    change_order_status = bool
-    first_change_to = wtypes.text
-
-
-class Order(APIBase):
-    """One single order."""
-    order_id = wtypes.text
-    resource_id = wtypes.text
-    resource_name = wtypes.text
-    status = wtypes.text
-    unit_price = float
-    unit = wtypes.text
-    total_price = float
-    type = wtypes.text
-    cron_time = wtypes.text
-    date_time = wtypes.text
-    created_at = wtypes.text
-    updated_at = wtypes.text
-    user_id = wtypes.text
-    project_id = wtypes.text
-    domain_id = wtypes.text
-    region_id = wtypes.text
-    owed = bool
-    renew = bool
-    renew_method = wtypes.text
-    renew_period = int
-
-
-class Orders(APIBase):
-    """Collection of orders."""
-    total_count = int
-    orders = [Order]

@@ -26,7 +26,7 @@ def _create_temp_account(**kwargs):
     return account
 
 
-def create_test_account(context, **kwargs):
+def create_test_account(context, *args, **kwargs):
     account = _create_temp_account(**kwargs)
     dbapi.create_account(context, account)
     return account

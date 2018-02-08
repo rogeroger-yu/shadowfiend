@@ -39,21 +39,18 @@ TRANSPORT_ALIASES = {
 }
 
 service_opts = [
+    cfg.BoolOpt('allow_owe_action',
+                default=True,
+                help='Enable the logic of owe'),
     cfg.StrOpt('host',
                default=socket.getfqdn(),
                help='Name of this node. This can be an opaque identifier. '
                'It is not necessarily a hostname, FQDN, or IP address. '
                'However, the node name must be valid within an AMQP key, '
                'and if using ZeroMQ, a valid hostname, FQDN, or IP address.'),
-    cfg.IntOpt('report_interval',
-               default=10,
-               help='Seconds between nodes reporting state to datastore'),
     cfg.BoolOpt('periodic_enable',
                 default=True,
                 help='Enable periodic tasks'),
-    cfg.BoolOpt('owe_enable',
-                default=True,
-                help='Enable the logic of owe'),
     cfg.IntOpt('periodic_fuzzy_delay',
                default=60,
                help='Range of seconds to randomly delay when starting the'
@@ -63,6 +60,9 @@ service_opts = [
                default=60,
                help='Max interval size between periodic tasks execution in '
                     'seconds.'),
+    cfg.IntOpt('report_interval',
+               default=10,
+               help='Seconds between nodes reporting state to datastore'),
 ]
 
 cfg.CONF.register_opts(service_opts)

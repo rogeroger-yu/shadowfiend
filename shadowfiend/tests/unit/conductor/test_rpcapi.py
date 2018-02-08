@@ -25,6 +25,7 @@ class RPCAPITestCase(base.DbTestCase):
     def setUp(self):
         super(RPCAPITestCase, self).setUp()
         self.fake_account = dbutils.get_test_account(driver='fake-driver')
+        self.fake_project = dbutils.get_test_project(driver='fake-driver')
 
     def _test_rpcapi(self, method, rpc_method, **kwargs):
         rpcapi_cls = kwargs.pop('rpcapi_cls', conductor_rpcapi.API)
@@ -82,5 +83,6 @@ class RPCAPITestCase(base.DbTestCase):
                           '_call',
                           version='1.1',
                           context=self.context,
-                          balance=10,
-                          user_id=self.fake_account['user_id'])
+                          consumption=10,
+                          user_id=self.fake_account['user_id'],
+                          project_id=self.fake_project['project_id'])

@@ -244,14 +244,6 @@ class OrderUpdateFailed(ShadowfiendException):
     message = "Order update failed"
 
 
-class ProductIdNotFound(NotFound):
-    message = "Product %(product_id)s could not be found"
-
-
-class ProductNameNotFound(NotFound):
-    message = "Product %(product_name)s could not be found"
-
-
 class NoValidHost(NotFound):
     message = "No valid host was found. %(reason)s"
 

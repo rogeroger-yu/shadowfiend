@@ -13,8 +13,6 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-from __future__ import absolute_import
-
 import copy
 import json
 import logging
@@ -94,7 +92,8 @@ class Project(object):
         return copy.copy(self.__dict__)
 
 
-@dependency.requires('role_api', 'resource_api', 'identity_api')
+@dependency.requires('role_api', 'resource_api',
+                     'identity_api', 'assignment_api')
 class KeystoneBillingProtocol(object):
 
     def __init__(self, app, conf):
@@ -338,8 +337,20 @@ class KeystoneBillingProtocol(object):
 
     def add_role(self, env, start_response, user_id, project_id):
         try:
+            # change billing owner in shadowfiend
             self.sf_client.change_billing_owner(
                 user_id, project_id)
+
+            # remove expired assignments in keystone
+            assignments = self.assignment_api.list_role_assignments(
+                role_id=self.billing_owner_role_id,
+                project_id=project_id)
+            for assignment in assignments:
+                if assignment['user_id'] != user_id:
+                    self.assignment_api.remove_role_from_user_and_project(
+                        assignment['user_id'],
+                        project_id,
+                        self.billing_owner_role_id)
         except Exception:
             return False, self._reject_request_500(env, start_response)
         return True, None

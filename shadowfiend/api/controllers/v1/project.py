@@ -13,7 +13,6 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-import datetime
 import itertools
 import pecan
 
@@ -37,11 +36,6 @@ HOOK = pecan.request
 
 class BillingOwnerController(rest.RestController):
 
-    _custom_actions = {
-        'freeze': ['PUT'],
-        'unfreeze': ['PUT'],
-    }
-
     def __init__(self, project_id):
         self.project_id = project_id
 
@@ -60,14 +54,6 @@ class BillingOwnerController(rest.RestController):
             HOOK.context,
             self.project_id)
         return db_models.Account(**user_account)
-
-    @wsexpose(models.BalanceFrozenResult, body=models.BalanceFrozenBody)
-    def freeze(self, data):
-        pass
-
-    @wsexpose(models.BalanceFrozenResult, body=models.BalanceFrozenBody)
-    def unfreeze(self, data):
-        pass
 
 
 class ExistProjectController(rest.RestController):
@@ -100,11 +86,6 @@ class ExistProjectController(rest.RestController):
     def get(self):
         """Return this project."""
         return db_models.Project(**self._project())
-
-    @wsexpose(models.Summaries, wtypes.text)
-    def estimate(self, region_id=None):
-        """Get estimation of specified project and region."""
-        pass
 
 
 class ProjectController(rest.RestController):
@@ -199,7 +180,7 @@ class ProjectController(rest.RestController):
         elif type.lower() == 'simple':
             duration = timeutils.normalize_timedelta(duration)
             if duration:
-                active_from = datetime.datetime.utcnow() - duration
+                active_from = timeutils.utcnow() - duration
             else:
                 active_from = None
             sf_projects = list(HOOK.conductor_rpcapi.get_projects(

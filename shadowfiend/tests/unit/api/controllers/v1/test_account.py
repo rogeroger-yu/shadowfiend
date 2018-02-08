@@ -123,7 +123,7 @@ class TestPutAccount(api_base.FunctionalTest):
             def _mock_inside(*args, **kwargs):
                 pass
             with mock.patch.object(sql_dbapi.Connection,
-                                   '_compare_and_swap', _mock_inside):
+                                   '_update_params', _mock_inside):
                 response = self.put_json('/accounts/%s/level' %
                                          account.user_id, body)
                 self.assertEqual(200, response.status_int)

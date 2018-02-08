@@ -16,10 +16,6 @@
 from oslo_versionedobjects import base
 
 
-class ShadowfiendObjectRegistry(base.VersionedObjectRegistry):
-    pass
-
-
 class ShadowfiendObject(base.VersionedObject):
     """Base class and object factory.
 

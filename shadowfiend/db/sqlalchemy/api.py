@@ -15,9 +15,7 @@
 
 import datetime
 import functools
-import json as jsonutils
 import os
-import wsme
 
 from decimal import Decimal
 from oslo_config import cfg
@@ -28,7 +26,6 @@ from oslo_log import log
 from oslo_utils import timeutils
 from oslo_utils import uuidutils
 
-from shadowfiend.common import constants as const
 from shadowfiend.common import context as shadow_context
 from shadowfiend.common import exception
 from shadowfiend.common import utils
@@ -40,7 +37,6 @@ from shadowfiend.db.sqlalchemy import models as sa_models
 from sqlalchemy import asc
 from sqlalchemy import desc
 from sqlalchemy import func
-from sqlalchemy import not_
 from sqlalchemy.orm.exc import NoResultFound
 
 LOG = log.getLogger(__name__)
@@ -254,43 +250,6 @@ class Connection(api.Connection):
             else None)
 
     @staticmethod
-    def _row_to_db_product_model(row):
-        return db_models.Product(product_id=row.product_id,
-                                 name=row.name,
-                                 service=row.service,
-                                 region_id=row.region_id,
-                                 description=row.description,
-                                 deleted=row.deleted,
-                                 unit_price=row.unit_price,
-                                 created_at=row.created_at,
-                                 updated_at=row.updated_at,
-                                 deleted_at=row.deleted_at)
-
-    @staticmethod
-    def _row_to_db_order_model(row):
-        return db_models.Order(order_id=row.order_id,
-                               resource_id=row.resource_id,
-                               resource_name=row.resource_name,
-                               type=row.type,
-                               status=row.status,
-                               unit_price=row.unit_price,
-                               unit=row.unit,
-                               total_price=row.total_price,
-                               cron_time=row.cron_time,
-                               date_time=row.date_time,
-                               user_id=row.user_id,
-                               project_id=row.project_id,
-                               region_id=row.region_id,
-                               domain_id=row.domain_id,
-                               owed=row.owed,
-                               charged=row.charged,
-                               renew=row.renew,
-                               renew_method=row.renew_method,
-                               renew_period=row.renew_period,
-                               created_at=row.created_at,
-                               updated_at=row.updated_at)
-
-    @staticmethod
     def _row_to_db_account_model(row):
         return db_models.Account(user_id=row.user_id,
                                  domain_id=row.domain_id,
@@ -342,33 +301,8 @@ class Connection(api.Connection):
                                    expired_at=row.expired_at,
                                    remarks=row.remarks)
 
-    def _product_object_to_dict(self, product):
-        p_dict = product.as_dict()
-        try:
-            p_dict['unit_price'] = p_dict['unit_price'].as_dict()
-            for key in ['price', 'monthly_price', 'yearly_price']:
-                if key in p_dict['unit_price']:
-                    p_dict['unit_price'][key] = \
-                        p_dict['unit_price'][key].as_dict()
-                    new_segmented = []
-                    base_price = p_dict['unit_price'][key]['base_price']
-                    p_dict['unit_price'][key]['base_price'] = str(base_price)
-                    for seg in p_dict['unit_price'][key]['segmented']:
-                        new_seg = seg.as_dict()
-                        new_seg['price'] = str(new_seg['price'])
-                        new_segmented.append(new_seg)
-                    p_dict['unit_price'][key]['segmented'] = \
-                        sorted(new_segmented, key=lambda p: p['count'],
-                               reverse=True)
-            p_dict['unit_price'] = jsonutils.dumps(p_dict['unit_price'])
-        except KeyError:
-            LOG.error("The unit_price lack of some key words.")
-            return None
-
-        return p_dict
-
-    def _compare_and_swap(self, query, ref, filters,
-                          params, failed_exception):
+    def _update_params(self, query, ref, filters,
+                       params, failed_exception):
         update_filters = {}
         for f in filters:
             update_filters[f] = getattr(ref, f)
@@ -390,358 +324,11 @@ class Connection(api.Connection):
         filters.append('project_id')
         if user_id:
             filters.append('user_id')
-        self._compare_and_swap(model_query(context,
-                                           model,
-                                           session=session),
-                               obj, filters, params,
-                               exception.ConsumptionUpdateFailed())
-
-    @require_admin_context
-    @oslo_db_api.wrap_db_retry(max_retries=5, retry_on_deadlock=True)
-    def create_order(self, context, order):
-        session = get_session()
-        with session.begin():
-            # get project
-            try:
-                project = model_query(
-                    context, sa_models.Project, session=session).\
-                    filter_by(project_id=order['project_id']).\
-                    one()
-            except NoResultFound:
-                LOG.error('Could not find the project: %s',
-                          order['project_id'])
-                raise exception.ProjectNotFound(project_id=order['project_id'])
-
-            if not order['unit'] or order['unit'] == 'hour':
-                ref = sa_models.Order(
-                    order_id=order['order_id'],
-                    resource_id=order['resource_id'],
-                    resource_name=order['resource_name'],
-                    type=order['type'],
-                    unit_price=order['unit_price'],
-                    unit=order['unit'],
-                    total_price=0,
-                    cron_time=None,
-                    date_time=None,
-                    status=order['status'],
-                    user_id=project.user_id,  # the payer
-                    project_id=order['project_id'],
-                    domain_id=project.domain_id,
-                    region_id=order['region_id'],
-                )
-                session.add(ref)
-                self._transfer(ref)
-            else:
-                start_time = timeutils.utcnow()
-                months = utils.to_months(order['unit'], order['period'])
-                end_time = utils.add_months(start_time, months)
-                total_price = order['unit_price'] * order['period']
-                if order['period'] > 1:
-                    remarks = "Renew for %s %ss" % \
-                        (order['period'], order['unit'])
-                else:
-                    remarks = "Renew for %s %s" % \
-                        (order['period'], order['unit'])
-
-                # add a bill
-                bill = sa_models.Bill(
-                    bill_id=uuidutils.generate_uuid(),
-                    start_time=start_time,
-                    end_time=end_time,
-                    type=order['type'],
-                    status=const.BILL_PAYED,
-                    unit_price=order['unit_price'],
-                    unit=order['unit'],
-                    total_price=total_price,
-                    order_id=order['order_id'],
-                    resource_id=order['resource_id'],
-                    remarks=remarks,
-                    user_id=project.user_id,
-                    project_id=order['project_id'],
-                    region_id=order['region_id'],
-                    domain_id=project.domain_id)
-                session.add(bill)
-
-                # add an order
-                ref = sa_models.Order(
-                    order_id=order['order_id'],
-                    resource_id=order['resource_id'],
-                    resource_name=order['resource_name'],
-                    type=order['type'],
-                    unit_price=order['unit_price'],
-                    unit=order['unit'],
-                    total_price=total_price,
-                    cron_time=end_time,
-                    date_time=None,
-                    status=order['status'],
-                    user_id=project.user_id,  # the payer
-                    project_id=order['project_id'],
-                    domain_id=project.domain_id,
-                    region_id=order['region_id'],
-                )
-                if order['renew']:
-                    ref.renew = order['renew']
-                    ref.renew_method = order['unit']
-                    ref.renew_period = order['period']
-                session.add(ref)
-
-                # Update project and user_project
-                try:
-                    user_project = model_query(
-                        context, sa_models.UsrPrjRelation, session=session).\
-                        filter_by(project_id=order['project_id']).\
-                        filter_by(user_id=project.user_id).\
-                        one()
-                except NoResultFound:
-                    LOG.error('Could not find the relationship between '
-                              'user(%s) and project(%s)',
-                              project.user_id, order['project_id'])
-                    raise exception.UsrPrjRelationNotFound(
-                        user_id=project.user_id,
-                        project_id=order['project_id'])
-
-                self._update_consumption(context, session, project,
-                                         sa_models.Project, total_price)
-                self._update_consumption(context, session, user_project,
-                                         sa_models.UsrPrjRelation, total_price,
-                                         True)
-
-                # Update account
-                try:
-                    account = model_query(
-                        context, sa_models.Account, session=session).\
-                        filter_by(user_id=project.user_id).\
-                        one()
-                except NoResultFound:
-                    LOG.error('Could not find the account: %s',
-                              project.user_id)
-                    raise exception.AccountNotFound(user_id=project.user_id)
-
-                frozen_balance = account.frozen_balance - total_price
-                consumption = account.consumption + total_price
-                params = dict(frozen_balance=frozen_balance,
-                              consumption=consumption,
-                              updated_at=datetime.datetime.utcnow())
-                filters = params.keys()
-                filters.append('user_id')
-                self._compare_and_swap(model_query(context,
-                                                   sa_models.Account,
-                                                   session=session),
-                                       account, filters, params,
-                                       exception.AccountUpdateFailed())
-
-        return self._row_to_db_order_model(ref).__dict__
-
-    @require_admin_context
-    @oslo_db_api.wrap_db_retry(max_retries=5, retry_on_deadlock=True)
-    def update_order(self, context, **kwargs):
-        """Change unit price of this order"""
-
-        session = get_session()
-        with session.begin():
-            # caculate new unit price
-            unit_price = 0
-
-            # update the order
-            order = model_query(
-                context,
-                sa_models.Order,
-                session=session).filter_by(order_id=kwargs['order_id']).one()
-
-            params = dict(unit_price=unit_price,
-                          updated_at=datetime.datetime.utcnow())
-
-            if kwargs['change_order_status']:
-                params.update(
-                    status=kwargs['first_change_to'] or kwargs['change_to'])
-            if kwargs['cron_time']:
-                params.update(cron_time=kwargs['cron_time'])
-
-            filters = params.keys()
-            filters.append('order_id')
-            self._compare_and_swap(
-                model_query(context,
-                            sa_models.Order,
-                            session=session),
-                order,
-                filters,
-                params,
-                exception.OrderUpdateFailed())
-
-    @require_admin_context
-    @oslo_db_api.wrap_db_retry(max_retries=5, retry_on_deadlock=True)
-    def close_order(self, context, order_id):
-        session = get_session()
-        with session.begin():
-            try:
-                order = model_query(
-                    context, sa_models.Order, session=session).\
-                    filter_by(order_id=order_id).\
-                    one()
-            except NoResultFound:
-                raise exception.OrderNotFound(order_id=order_id)
-
-            params = dict(unit_price=quantize('0.0000'),
-                          status=const.STATE_DELETED,
-                          updated_at=datetime.datetime.utcnow())
-            filters = params.keys()
-            filters.append('order_id')
-
-            self._compare_and_swap(model_query(context,
-                                               sa_models.Order,
-                                               session=session),
-                                   order, filters, params,
-                                   exception.OrderUpdateFailed())
-        self._transfer(order)
-        return self._row_to_db_order_model(order).__dict__
-
-    @require_context
-    def get_order(self, context, order_id):
-        query = model_query(context, sa_models.Order).\
-            filter_by(order_id=order_id)
-        try:
-            ref = query.one()
-        except NoResultFound:
-            LOG.warning('The order %s not found' % order_id)
-            raise exception.OrderNotFound(order_id=order_id)
-
-        self._transfer(ref)
-        return self._row_to_db_order_model(ref).__dict__
-
-    @require_context
-    def get_orders(self, context, start_time=None, end_time=None, type=None,
-                   status=None, limit=None, offset=None, sort_key=None,
-                   sort_dir=None, with_count=False, region_id=None,
-                   user_id=None, project_ids=None, owed=None, resource_id=None,
-                   bill_methods=None, read_deleted=True):
-        """Get orders that have bills during start_time and end_time.
-
-        If start_time is None or end_time is None, will ignore the datetime
-        range, and return all orders
-        """
-        query = get_session().query(sa_models.Order)
-
-        if type:
-            query = query.filter_by(type=type)
-        if status:
-            query = query.filter_by(status=status)
-        if resource_id:
-            query = query.filter_by(resource_id=resource_id)
-        if bill_methods:
-            query = query.filter(sa_models.Order.unit.in_(bill_methods))
-        if region_id:
-            query = query.filter_by(region_id=region_id)
-        if user_id:
-            query = query.filter_by(user_id=user_id)
-        if project_ids:
-            query = query.filter(sa_models.Order.project_id.in_(project_ids))
-        if owed is not None:
-            query = query.filter_by(owed=owed)
-        if not read_deleted:
-            query = query.filter(
-                not_(sa_models.Order.status == const.STATE_DELETED))
-
-        if all([start_time, end_time]):
-            query = query.join(
-                sa_models.Bill,
-                sa_models.Order.order_id == sa_models.Bill.order_id
-            )
-            query = query.filter(sa_models.Bill.start_time >= start_time,
-                                 sa_models.Bill.start_time < end_time)
-            query = query.group_by(sa_models.Bill.order_id)
-
-        if with_count:
-            total_count = query.count()
-
-        result = paginate_query(context, sa_models.Order,
-                                limit=limit, offset=offset,
-                                sort_key=sort_key, sort_dir=sort_dir,
-                                query=query)
-        rows = (self._row_to_db_order_model(o) for o in result)
-        if with_count:
-            return rows, total_count
-        else:
-            return rows
-
-    @require_admin_context
-    def get_active_order_count(self, context, region_id=None,
-                               owed=None, type=None, bill_methods=None):
-        query = model_query(context, sa_models.Order,
-                            func.count(sa_models.Order.id).label('count'))
-        if region_id:
-            query = query.filter_by(region_id=region_id)
-        if owed is not None:
-            query = query.filter_by(owed=owed)
-        if type:
-            query = query.filter_by(type=type)
-        if bill_methods:
-            query = query.filter(sa_models.Order.unit.in_(bill_methods))
-
-        query = query.filter(
-            not_(sa_models.Order.status == const.STATE_DELETED)
-        )
-        if not owed:
-            query = query.filter(
-                not_(sa_models.Order.cron_time == None)  # noqa
-            )
-        return query.one().count or 0
-
-    @require_admin_context
-    def get_stopped_order_count(self, context, region_id=None,
-                                owed=None, type=None, bill_methods=None):
-        query = model_query(context, sa_models.Order,
-                            func.count(sa_models.Order.id).label('count'))
-        if region_id:
-            query = query.filter_by(region_id=region_id)
-        if owed is not None:
-            query = query.filter_by(owed=owed)
-        if type:
-            query = query.filter_by(type=type)
-        if bill_methods:
-            query = query.filter(sa_models.Order.unit.in_(bill_methods))
-
-        query = query.filter(sa_models.Order.status == const.STATE_STOPPED)
-        query = query.filter(
-            sa_models.Order.unit_price == quantize('0'))
-        return query.one().count or 0
-
-    @require_context
-    def get_active_orders(self, context, type=None, limit=None, offset=None,
-                          sort_key=None, sort_dir=None, region_id=None,
-                          user_id=None, project_id=None, owed=None,
-                          charged=None, within_one_hour=None,
-                          bill_methods=None):
-        """Get all active orders"""
-
-        query = get_session().query(sa_models.Order)
-
-        if type:
-            query = query.filter_by(type=type)
-        if region_id:
-            query = query.filter_by(region_id=region_id)
-        if user_id:
-            query = query.filter_by(user_id=user_id)
-        if project_id:
-            query = query.filter_by(project_id=project_id)
-        if owed is not None:
-            query = query.filter_by(owed=owed)
-        if charged:
-            query = query.filter_by(charged=charged)
-        if bill_methods:
-            query = query.filter(sa_models.Order.unit.in_(bill_methods))
-
-        if within_one_hour:
-            one_hour_later = timeutils.utcnow() + datetime.timedelta(hours=1)
-            query = query.filter(sa_models.Order.cron_time < one_hour_later)
-
-        query = query.filter(
-            not_(sa_models.Order.status == const.STATE_DELETED))
-
-        result = paginate_query(context, sa_models.Order,
-                                limit=limit, offset=offset,
-                                sort_key=sort_key, sort_dir=sort_dir,
-                                query=query)
-        return (self._row_to_db_order_model(o) for o in result)
+        self._update_params(model_query(context,
+                                        model,
+                                        session=session),
+                            obj, filters, params,
+                            exception.ConsumptionUpdateFailed())
 
     def create_account(self, context, account):
         session = get_session()
@@ -844,11 +431,11 @@ class Connection(api.Connection):
             filters = params.keys()
             filters.append('user_id')
 
-            self._compare_and_swap(model_query(context,
-                                               sa_models.Account,
-                                               session=session),
-                                   account_ref, filters, params,
-                                   exception.AccountUpdateFailed())
+            self._update_params(model_query(context,
+                                            sa_models.Account,
+                                            session=session),
+                                account_ref, filters, params,
+                                exception.AccountUpdateFailed())
 
         self._transfer(account_ref)
         return self._row_to_db_account_model(account_ref).__dict__
@@ -891,68 +478,46 @@ class Connection(api.Connection):
         return self._row_to_db_charge_model(charge_ref).__dict__
 
     @oslo_db_api.wrap_db_retry(max_retries=5, retry_on_deadlock=True)
-    def update_account(self, context, user_id, project_id=None,
+    def update_account(self, context, user_id, project_id, consumption,
                        **data):
         """Update account"""
 
         session = get_session()
         with session.begin():
-            balance = 0
-
             account = model_query(
                 context,
                 sa_models.Account,
                 session=session).filter_by(user_id=user_id).one()
+            balance = account.balance - consumption
             params = dict(balance=balance,
                           updated_at=datetime.datetime.utcnow())
             if balance < 0:
                 params.update(owed=True, owed_at=datetime.datetime.utcnow())
             filters = params.keys()
             filters.append('user_id')
-            self._compare_and_swap(
-                model_query(context,
-                            sa_models.Account,
-                            session=session),
-                account,
-                filters,
-                params,
-                exception.AccountUpdateFailed())
+            self._update_params(model_query(context,
+                                            sa_models.Account,
+                                            session=session),
+                                account, filters, params,
+                                exception.AccountUpdateFailed())
 
-    def set_charged_orders(self, context, user_id, project_id=None):
-        """Set owed orders to charged"""
-
-        session = get_session()
-        with session.begin():
-            # set owed order in all regions to charged
-            if project_id:
-                query = session.query(sa_models.Order).\
-                    filter_by(project_id=project_id).\
-                    filter_by(owed=True)
-            else:
-                query = session.query(sa_models.Order).\
-                    filter_by(user_id=user_id).\
-                    filter_by(owed=True)
-
-            orders = query.filter(
-                not_(sa_models.Order.status == const.STATE_DELETED)).all()
-
-            for order in orders:
-                order.owed = False
-                order.date_time = None
-                order.charged = True
-
-    @oslo_db_api.wrap_db_retry(max_retries=5, retry_on_deadlock=True)
-    def reset_charged_orders(self, context, order_ids):
-        session = get_session()
-        with session.begin():
-            for order_id in order_ids:
-                try:
-                    order = session.query(sa_models.Order).\
-                        filter_by(order_id=order_id).\
-                        one()
-                except NoResultFound:
-                    continue
-                order.charged = False
+            # Update relation
+            user_project = model_query(
+                context, sa_models.UsrPrjRelation, session=session).\
+                filter_by(user_id=user_id).\
+                filter_by(project_id=project_id).\
+                one()
+            consumption = user_project.consumption + consumption
+            params = dict(consumption=consumption,
+                          updated_at=timeutils.utcnow())
+            filters = params.keys()
+            filters.append('user_id')
+            filters.append('project_id')
+            self._update_params(model_query(context,
+                                            sa_models.UsrPrjRelation,
+                                            session=session),
+                                user_project, filters, params,
+                                exception.UserProjectUpdateFailed())
 
     def get_charges(self, context, user_id=None, project_id=None, type=None,
                     start_time=None, end_time=None,
@@ -1034,60 +599,6 @@ class Connection(api.Connection):
 
         self._transfer(account_ref)
         return self._row_to_db_account_model(account_ref).__dict__
-
-    @require_admin_context
-    @oslo_db_api.wrap_db_retry(max_retries=5, retry_on_deadlock=True)
-    def freeze_balance(self, context, project_id, total_price):
-        session = get_session()
-        with session.begin():
-            try:
-                project = model_query(context, sa_models.Project).\
-                    filter_by(project_id=project_id).one()
-            except NoResultFound:
-                raise exception.ProjectNotFound(project_id=project_id)
-
-            try:
-                account = session.query(sa_models.Account).\
-                    filter_by(user_id=project.user_id).\
-                    one()
-            except NoResultFound:
-                raise exception.AccountNotFound(user_id=project.user_id)
-
-            if account.balance < total_price and account.level != 9:
-                raise exception.NotSufficientFund(user_id=project.user_id,
-                                                  project_id=project_id)
-
-            account.balance -= total_price
-            account.frozen_balance += total_price
-
-        return self._row_to_db_account_model(account)
-
-    @require_admin_context
-    @oslo_db_api.wrap_db_retry(max_retries=5, retry_on_deadlock=True)
-    def unfreeze_balance(self, context, project_id, total_price):
-        session = get_session()
-        with session.begin():
-            try:
-                project = model_query(context, sa_models.Project).\
-                    filter_by(project_id=project_id).one()
-            except NoResultFound:
-                raise exception.ProjectNotFound(project_id=project_id)
-
-            try:
-                account = session.query(sa_models.Account).\
-                    filter_by(user_id=project.user_id).\
-                    one()
-            except NoResultFound:
-                raise exception.AccountNotFound(user_id=project.user_id)
-
-            if account.frozen_balance < total_price:
-                raise exception.NotSufficientFrozenBalance(
-                    user_id=project.user_id, project_id=project_id)
-
-            account.balance += total_price
-            account.frozen_balance -= total_price
-
-        return self._row_to_db_account_model(account)
 
     def get_project(self, context, project_id):
         try:
@@ -1178,29 +689,15 @@ class Connection(api.Connection):
                 LOG.error('Could not find the project: %s' % project_id)
                 raise exception.ProjectNotFound(project_id=project_id)
 
-            # change user_id of all orders belongs to this project
-            orders = model_query(context, sa_models.Order, session=session).\
-                filter_by(project_id=project_id).\
-                all()
-            for order in orders:
-                params = dict(user_id=user_id)
-                filters = params.keys()
-                filters.append('project_id')
-                self._compare_and_swap(model_query(context,
-                                                   sa_models.Order,
-                                                   session=session),
-                                       order, filters, params,
-                                       exception.OrderUpdateFailed())
-
             # change payer of this project
             params = dict(user_id=user_id)
             filters = params.keys()
             filters.append('project_id')
-            self._compare_and_swap(model_query(context,
-                                               sa_models.Project,
-                                               session=session),
-                                   project, filters, params,
-                                   exception.ProjectUpdateFailed())
+            self._update_params(model_query(context,
+                                            sa_models.Project,
+                                            session=session),
+                                project, filters, params,
+                                exception.ProjectUpdateFailed())
 
             # add/update relationship between user and project
             try:
@@ -1213,11 +710,11 @@ class Connection(api.Connection):
                 filters = params.keys()
                 filters.append('user_id')
                 filters.append('project_id')
-                self._compare_and_swap(model_query(context,
-                                                   sa_models.UsrPrjRelation,
-                                                   session=session),
-                                       user_project, filters, params,
-                                       exception.UserProjectUpdateFailed())
+                self._update_params(model_query(context,
+                                                sa_models.UsrPrjRelation,
+                                                session=session),
+                                    user_project, filters, params,
+                                    exception.UserProjectUpdateFailed())
             except NoResultFound:
                 session.add(
                     sa_models.UsrPrjRelation(user_id=user_id,
@@ -1225,13 +722,8 @@ class Connection(api.Connection):
                                              consumption='0',
                                              domain_id=project.domain_id))
 
-    def _check_if_account_charged(self, account, order):
-        if not account.owed and order.owed:
-            return True
-        return False
-
-    def _check_if_order_first_owed(self, account, order):
-        if account.owed and not order.owed:
+    def _check_if_account_charged(self, account):
+        if not account.owed:
             return True
         return False
 
@@ -1242,177 +734,3 @@ class Connection(api.Connection):
             return True
         else:
             return False
-
-    @require_admin_context
-    @oslo_db_api.wrap_db_retry(max_retries=5, retry_on_deadlock=True)
-    def fix_order(self, context, order_id):
-        session = get_session()
-        with session.begin():
-            order = model_query(context, sa_models.Order, session=session).\
-                filter_by(order_id=order_id).\
-                one()
-            bills = model_query(context, sa_models.Bill, session=session).\
-                filter_by(order_id=order_id).all()
-            account = model_query(
-                context, sa_models.Account, session=session).\
-                filter_by(project_id=order.project_id).\
-                one()
-
-            one_hour_later = timeutils.utcnow() + datetime.timedelta(hours=1)
-            more_fee = 0
-
-            for bill in bills:
-                if bill.end_time > one_hour_later:
-                    more_fee += bill.total_price
-                    session.delete(bill)
-
-            bill = model_query(context, sa_models.Bill, session=session).\
-                filter_by(order_id=order_id).\
-                order_by(desc(sa_models.Bill.id)).all()[0]
-
-            order.cron_time = bill.end_time
-            order.total_price -= more_fee
-
-            account.balance += more_fee
-            account.consumption -= more_fee
-
-    @require_context
-    @oslo_db_api.wrap_db_retry(max_retries=5, retry_on_deadlock=True)
-    def fix_stopped_order(self, context, order_id):
-        session = get_session()
-        with session.begin():
-            order = session.query(sa_models.Order).\
-                filter_by(order_id=order_id).one()
-            bills = session.query(sa_models.Bill).\
-                filter_by(order_id=order_id).\
-                order_by(desc(sa_models.Bill.id)).all()
-            account = session.query(sa_models.Account).\
-                filter_by(project_id=order.project_id).one()
-
-            more_fee = quantize('0')
-            add_new_bill = True
-
-            for bill in bills:
-                if bill.total_price == quantize('0.0020') or \
-                        bill.total_price == quantize('0.0400') or \
-                        bill.total_price == quantize('0.0800'):
-                    more_fee += bill.total_price
-                if bill.total_price == quantize('0.0000'):
-                    add_new_bill = False
-                    cron_time = bill.end_time
-                    break
-                if (bill.total_price != quantize('0.0020') and
-                        bill.total_price != quantize('0.0400') and
-                        bill.total_price != quantize('0.0800')) or \
-                        bill.remarks == 'Sytstem Adjust':
-                    start_time = bill.end_time
-                    cron_time = bill.end_time + datetime.timedelta(days=30)
-                    break
-                session.delete(bill)
-
-            if add_new_bill:
-                bill = sa_models.Bill(
-                    bill_id=uuidutils.generate_uuid(),
-                    start_time=start_time,
-                    end_time=start_time + datetime.timedelta(days=30),
-                    type=order.type,
-                    status=const.BILL_PAYED,
-                    unit_price=quantize('0.0000'),
-                    unit=order.unit,
-                    total_price=quantize('0.0000'),
-                    order_id=order.order_id,
-                    resource_id=order.resource_id,
-                    remarks='Instance Has Been Stopped',
-                    user_id=order.user_id,
-                    project_id=order.project_id,
-                    region_id=order.region_id)
-                session.add(bill)
-
-            order.unit_price = quantize('0.0000')
-            order.cron_time = cron_time
-
-            order.total_price -= more_fee
-            account.balance += more_fee
-            account.consumption -= more_fee
-
-    @oslo_db_api.wrap_db_retry(max_retries=5, retry_on_deadlock=True)
-    def transfer_money(self, cxt, data):
-        session = get_session()
-        with session.begin():
-            account_to = session.query(sa_models.Account).\
-                filter_by(user_id=data.user_id_to).\
-                one()
-            account_from = session.query(sa_models.Account).\
-                filter_by(user_id=data.user_id_from).\
-                one()
-
-            if cxt.domain_id != account_to.domain_id or \
-                    cxt.domain_id != account_from.domain_id or \
-                    account_to.domain_id != account_from.domain_id:
-                raise exception.NotAuthorized()
-
-            if account_from.balance <= 0:
-                raise exception.NoBalanceToTransfer(value=account_from.balance)
-
-            if account_from.balance < data.money:
-                raise exception.InvalidTransferMoneyValue(value=data.money)
-
-            account_to.balance += data.money
-            account_from.balance -= data.money
-
-            remarks = data.remarks if data.remarks != wsme.Unset else None
-            charge_time = datetime.datetime.utcnow()
-            charge_to = sa_models.Charge(charge_id=uuidutils.generate_uuid(),
-                                         user_id=account_to.user_id,
-                                         project_id=account_to.project_id,
-                                         domain_id=account_to.domain_id,
-                                         value=data.money,
-                                         type="transfer",
-                                         come_from="transfer",
-                                         charge_time=charge_time,
-                                         operator=cxt.user_id,
-                                         remarks=remarks)
-            session.add(charge_to)
-
-            charge_from = sa_models.Charge(charge_id=uuidutils.generate_uuid(),
-                                           user_id=account_from.user_id,
-                                           project_id=account_from.project_id,
-                                           domain_id=account_from.domain_id,
-                                           value=-data.money,
-                                           type="transfer",
-                                           come_from="transfer",
-                                           charge_time=charge_time,
-                                           operator=cxt.user_id,
-                                           remarks=remarks)
-            session.add(charge_from)
-
-    @oslo_db_api.wrap_db_retry(max_retries=5, retry_on_deadlock=True)
-    def switch_auto_renew(self, context, order_id, action):
-        session = get_session()
-        with session.begin():
-            try:
-                order = model_query(
-                    context, sa_models.Order, session=session).\
-                    filter_by(order_id=order_id).\
-                    one()
-            except NoResultFound:
-                raise exception.OrderNotFound(order_id=order_id)
-
-            if not order.unit or order.unit == 'hour':
-                raise exception.OrderRenewError(
-                    err="Hourly billing resources can't be renewed")
-
-            if order.status == const.STATE_DELETED:
-                raise exception.OrderRenewError(
-                    err="Deleted resource can't be renewed")
-
-            if not order.renew_method or not order.renew_period:
-                raise exception.OrderRenewError(
-                    err="The order's auto renew has not been activated")
-
-            if action == 'start':
-                order.renew = True
-            elif action == 'stop':
-                order.renew = False
-            order.updated_at = datetime.datetime.utcnow()
-        return self._row_to_db_order_model(order)

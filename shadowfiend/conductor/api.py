@@ -93,9 +93,11 @@ class API(rpc_service.API):
                       level=level)
         return self._call(context, 'change_account_level', **kwargs)
 
-    def update_account(self, context, user_id, balance, **data):
+    def update_account(self, context, user_id, project_id, consumption,
+                       **data):
         kwargs = dict(user_id=user_id,
-                      balance=balance,
+                      project_id=project_id,
+                      consumption=consumption,
                       **data)
         return self._call(context, 'update_account', **kwargs)
 
@@ -124,23 +126,3 @@ class API(rpc_service.API):
                       start_time=start_time,
                       end_time=end_time)
         return self._call(context, 'get_charges_price_and_count', **kwargs)
-
-    def create_order(self, context, order):
-        return self._call(context, 'create_order', **order)
-
-    def close_order(self, context, order_id):
-        kwargs = dict(order_id=order_id)
-        return self._call(context, 'close_order', **kwargs)
-
-    def get_order(self, context, order_id):
-        kwargs = dict(order_id=order_id)
-        return self._call(context, 'get_order', **kwargs)
-
-    def update_order(self, context, order_id, change_to,
-                     cron_time, change_order_status, first_change_to):
-        kwargs = dict(order_id=order_id,
-                      change_to=change_to,
-                      cron_time=cron_time,
-                      change_order_status=change_order_status,
-                      first_change_to=first_change_to)
-        return self._call(context, 'update_order', **kwargs)

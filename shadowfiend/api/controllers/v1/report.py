@@ -35,7 +35,6 @@ from shadowfiend.services import keystone as ks_client
 from shadowfiend.common import timeutils
 
 
-OUTPUT_TIME_FORMAT = '%Y-%m-%d %H:%M:%S'
 LOG = log.getLogger(__name__)
 HOOK = pecan.request
 
@@ -55,6 +54,9 @@ class ChargesController(rest.RestController):
            * CSV (Sets)
            * JSON (Sets)
         """
+        policy.check_policy(HOOK.context, "charges:export",
+                            action="charges:export")
+
         tablib.formats.json.json = json
 
         if output_format.lower() not in ["xls", "xlsx", "csv", "yaml", "json"]:
@@ -129,7 +131,7 @@ class ChargesController(rest.RestController):
 
 
 class OrdersController(rest.RestController):
-    """Download orders logic
+    """Report orders logic
     """
     @wsexpose(None, wtypes.text, wtypes.text, wtypes.text,
               datetime.datetime, datetime.datetime, int, int,
@@ -142,6 +144,9 @@ class OrdersController(rest.RestController):
         If start_time and end_time is not None, will get orders that have bills
         during start_time and end_time, or return all orders directly.
         """
+        policy.check_policy(HOOK.context, "charges:export",
+                            action="charges:export")
+
         tablib.formats.json.json = json
         _gnocchi_fetcher = fetcher.GnocchiFetcher()
 
@@ -153,8 +158,6 @@ class OrdersController(rest.RestController):
 
         if all_get and acl.context_is_admin(HOOK.headers):
             user_id = None
-        project_id = (HOOK.headers.get('X-Project-Id')
-                      if (user_id and project_id) else None)
 
         MAP = {"instance": u"虚拟机",
                "volume": u"云硬盘",
@@ -199,8 +202,8 @@ class OrdersController(rest.RestController):
         return response
 
 
-class DownloadsController(rest.RestController):
-    """Manages operations on the downloads operations
+class ReportsController(rest.RestController):
+    """Manages operations on the reports operations
     """
     charges = ChargesController()
     orders = OrdersController()

@@ -18,23 +18,6 @@ import uuid
 
 from decimal import Decimal
 from decimal import ROUND_HALF_UP
-from shadowfiend.common import constants as const
-
-STATE_MAPPING = {
-    'ACTIVE': const.STATE_RUNNING,
-    'active': const.STATE_RUNNING,
-    'available': const.STATE_RUNNING,
-    'in-use': const.STATE_RUNNING,
-    'deprecated': const.STATE_RUNNING,
-    'DOWN': const.STATE_RUNNING,
-    'SHUTOFF': const.STATE_STOPPED,
-    'SUSPENDED': const.STATE_SUSPEND,
-    'PAUSED': const.STATE_SUSPEND,
-    'True': const.STATE_RUNNING,
-    'False': const.STATE_STOPPED,
-    'true': const.STATE_RUNNING,
-    'false': const.STATE_STOPPED,
-}
 
 
 def _quantize_decimal(value):
@@ -42,13 +25,6 @@ def _quantize_decimal(value):
         return value.quantize(Decimal('0.0001'), rounding=ROUND_HALF_UP)
     return Decimal(str(value)).quantize(Decimal('0.0001'),
                                         rounding=ROUND_HALF_UP)
-
-
-def transform_status(status):
-    try:
-        return STATE_MAPPING[status]
-    except KeyError:
-        return const.STATE_ERROR
 
 
 def true_or_false(abool):
