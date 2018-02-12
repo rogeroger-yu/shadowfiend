@@ -2,7 +2,6 @@
 # of appearance. Changing the order has an impact on the overall integration
 # process, which may cause wedges in the gate later.
 
-fixtures>=3.0.0
 tooz>=1.59.0
 six>=1.10.0
 iso8601>=0.1.12
@@ -18,7 +17,6 @@ gnocchiclient>=2.5.0
 keystoneauth1>=3.4.0
 python_keystoneclient>=3.14.0
 keystonemiddleware!=4.1.0,>=4.0.0
-python_memcached>=1.59
 python-neutronclient>=2.6.0
 python_novaclient>=10.0.0
 oslo_concurrency>=3.25.0
@@ -36,5 +34,4 @@ oslo.versionedobjects>=1.13.0
 oslotest>=3.2.0
 PasteScript>=2.0.2
 pecan>=1.0.0
-testscenarios>=0.5.0
 wsme>=0.8.0
