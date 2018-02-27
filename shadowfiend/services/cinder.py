@@ -20,6 +20,7 @@ from oslo_log import log
 
 from cinderclient import client as cinder_client
 from shadowfiend.services import BaseClient
+from shadowfiend.common.exception import NotFound
 
 
 LOG = log.getLogger(__name__)
@@ -31,9 +32,9 @@ SERVICE_CLIENT_OPTS = 'service_client'
 def drop_resource(service, resource_id):
     _volume_client = CinderClient()
     if service == 'volume.volume':
-        _volume_client.volume_delete(resource_id)
+        _volume_client.delete_volume(resource_id)
     elif service == 'volume.snapshot':
-        _volume_client.snapshot_delete(resource_id)
+        _volume_client.delete_snapshot(resource_id)
 
 
 class CinderClient(BaseClient):
@@ -45,7 +46,18 @@ class CinderClient(BaseClient):
             session=self.session,
             auth_url=self.auth.auth_url)
 
-    def volume_delete(self, volume_id, region_name=None):
+    def get_volume(self, volume_id, region_name=None):
+        try:
+            volume = self.cinder_client.volumes.get(volume_id)
+        except NotFound:
+            return None
+        return dict(id=volume.id,
+                    name=volume.display_name,
+                    original_status=volume.status,
+                    attachments=volume.attachments,
+                    size=volume.size)
+
+    def delete_volume(self, volume_id, region_name=None):
         search_opts = {'all_tenants': 1, 'volume_id': volume_id}
         snaps = self.cinder_client.volume_snapshots.list(
             detailed=False,
@@ -55,8 +67,8 @@ class CinderClient(BaseClient):
                 self.cinder_client.volume_snapshots.delete(snap)
             except Exception:
                 pass
-        volume = self.volume_get(volume_id, region_name=region_name)
-        for attachment in volume.attachments:
+        volume = self.get_volume(volume_id, region_name=region_name)
+        for attachment in volume['attachments']:
             try:
                 self.cinder_client.volumes.detach(volume_id,
                                                   attachment['attachment_id'])
@@ -67,5 +79,5 @@ class CinderClient(BaseClient):
         time.sleep(10)
         self.cinder_client.volumes.delete(volume_id)
 
-    def snapshot_delete(self, snap_id, region_name=None):
+    def delete_snapshot(self, snap_id, region_name=None):
         self.cinder_client.volume_snapshots.delete(snap_id)

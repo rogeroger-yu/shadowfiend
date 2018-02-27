@@ -29,7 +29,7 @@ CONF = cfg.CONF
 def drop_resource(service, resource_id):
     _nova_client = NovaClient()
     if service == 'compute':
-        _nova_client.server_delete(resource_id)
+        _nova_client.delete_server(resource_id)
 
 
 class NovaClient(BaseClient):
@@ -41,7 +41,7 @@ class NovaClient(BaseClient):
             session=self.session,
             auth_url=self.auth.auth_url)
 
-    def server_delete(self, instance_id):
+    def delete_server(self, instance_id):
         try:
             self.nova_client.servers.delete(instance_id)
         except NotFound:
