@@ -29,6 +29,7 @@ cover/
 nosetests.xml
 .testrepository
 .venv
+etc/shadowfiend/shadowfiend.conf.sample
 
 # Translations
 *.mo
