@@ -192,5 +192,6 @@ class Worker(object):
                     service_map[_service].drop_resource(_service,
                                                         resource['id'])
             except Exception as e:
-                LOG.warning("Error while drop resource: %s: %s" %
-                            (resource, e))
+                LOG.error("Error while drop resource: %s: %s" %
+                          (resource, e))
+                raise

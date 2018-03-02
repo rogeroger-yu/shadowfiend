@@ -34,6 +34,19 @@ def get_test_project(**kw):
     return attrs
 
 
+def get_test_relation(**kw):
+    attrs = {
+        'user_id': kw.get('user_id',
+                          ''.join(uuidutils.generate_uuid().split('-'))),
+        'project_id': kw.get('project_id',
+                             ''.join(uuidutils.generate_uuid().split('-'))),
+        'consumption': kw.get('consumption', 0.0),
+        'domain_id': kw.get('user_id', 'default'),
+        'created_at': kw.get('created_at'),
+    }
+    return attrs
+
+
 def get_test_charge(**kw):
     attrs = {
         'id': kw.get('id', 42),

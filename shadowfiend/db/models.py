@@ -117,13 +117,12 @@ class Project(Model):
 
 
 class UsrPrjRelation(Model):
-    def __init__(self, user_id, project_id, user_consumption,
-                 project_consumption, is_historical,
-                 created_at, *args, **kwargs):
+    def __init__(self, user_id, project_id, domain_id, consumption,
+                 created_at=None, updated_at=None, *args, **kwargs):
         Model.__init__(self,
                        user_id=user_id,
                        project_id=project_id,
-                       user_consumption=user_consumption,
-                       project_consumption=project_consumption,
-                       is_historical=is_historical,
-                       created_at=created_at)
+                       domain_id=domain_id,
+                       consumption=consumption,
+                       created_at=created_at,
+                       updated_at=updated_at)

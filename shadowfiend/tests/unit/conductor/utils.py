@@ -26,6 +26,18 @@ def _create_temp_account(**kwargs):
     return account
 
 
+def _create_temp_project(**kwargs):
+    db_project = db_utils.get_test_project(**kwargs)
+    project = db_models.Project(**db_project)
+    return project
+
+
+def _create_temp_relation(**kwargs):
+    db_relation = db_utils.get_test_relation(**kwargs)
+    relation = db_models.UsrPrjRelation(**db_relation)
+    return relation
+
+
 def create_test_account(context, *args, **kwargs):
     account = _create_temp_account(**kwargs)
     dbapi.create_account(context, account)
@@ -38,6 +50,10 @@ def get_test_account(_bond, context, user_id, *args, **kwargs):
 
 def get_test_accounts(_bond, context, *args, **kwargs):
     return dbapi.get_accounts(context, **kwargs)
+
+
+def update_test_account(_bond, context, *args, **kwargs):
+    return dbapi.update_account(context, **kwargs)
 
 
 def _create_temp_charge(user_id, **kwargs):
@@ -71,3 +87,15 @@ def change_test_account_level(_bond, context, *args, **kwargs):
 
 def delete_test_account(_bond, context, user_id, *args, **kwargs):
     return dbapi.delete_account(context, user_id, *args, **kwargs)
+
+
+def create_test_project(context, *args, **kwargs):
+    project = _create_temp_project(**kwargs)
+    dbapi.create_project(context, project)
+    return project
+
+
+def create_test_relation(context, *args, **kwargs):
+    relation = _create_temp_relation(**kwargs)
+    dbapi.change_billing_owner(context, relation.project_id, relation.user_id)
+    return relation

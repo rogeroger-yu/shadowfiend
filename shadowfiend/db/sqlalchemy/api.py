@@ -634,10 +634,10 @@ class Connection(api.Connection):
             up = db_models.UsrPrjRelation(
                 user_id=user_id,
                 project_id=u.project_id,
-                user_consumption=u.consumption,
-                project_consumption=p.consumption if p else u.consumption,
-                is_historical=False if p else True,
-                created_at=u.created_at)
+                domain_id=u.domain_id,
+                consumption=p.consumption if p else u.consumption,
+                created_at=u.created_at,
+                updated_at=u.updated_at)
 
             self._transfer(up)
             result.append(up.__dict__)
