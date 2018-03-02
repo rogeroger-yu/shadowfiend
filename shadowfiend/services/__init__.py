@@ -23,6 +23,14 @@ CONF = cfg.CONF
 
 SERVICE_CLIENT_OPTS = 'service_client'
 
+service_opts = [
+    cfg.StrOpt('auth_section',
+               default="keystone_authtoken",
+               help="the auth section for each services"),
+]
+
+CONF.register_opts(service_opts, group=SERVICE_CLIENT_OPTS)
+
 
 class BaseClient(object):
     def __init__(self):

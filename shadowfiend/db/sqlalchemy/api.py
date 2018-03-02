@@ -500,6 +500,21 @@ class Connection(api.Connection):
                                             session=session),
                                 account, filters, params,
                                 exception.AccountUpdateFailed())
+            # Update project
+            project = model_query(
+                context, sa_models.Project, session=session).\
+                filter_by(project_id=project_id).\
+                one()
+            prj_consumption = project.consumption + consumption
+            params = dict(consumption=prj_consumption,
+                          updated_at=timeutils.utcnow())
+            filters = params.keys()
+            filters.append('project_id')
+            self._update_params(model_query(context,
+                                            sa_models.Project,
+                                            session=session),
+                                project, filters, params,
+                                exception.ProjectUpdateFailed())
 
             # Update relation
             user_project = model_query(
@@ -507,8 +522,8 @@ class Connection(api.Connection):
                 filter_by(user_id=user_id).\
                 filter_by(project_id=project_id).\
                 one()
-            consumption = user_project.consumption + consumption
-            params = dict(consumption=consumption,
+            usr_prj_consumption = user_project.consumption + consumption
+            params = dict(consumption=usr_prj_consumption,
                           updated_at=timeutils.utcnow())
             filters = params.keys()
             filters.append('user_id')

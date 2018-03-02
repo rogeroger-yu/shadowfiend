@@ -18,8 +18,9 @@ import itertools
 import shadowfiend.api.app
 import shadowfiend.common.service
 import shadowfiend.conductor.config
-import shadowfiend.processor.config
 import shadowfiend.db
+import shadowfiend.processor.config
+import shadowfiend.services
 
 
 def list_opts():
@@ -33,4 +34,5 @@ def list_opts():
         ('conductor', shadowfiend.conductor.config.SERVICE_OPTS),
         ('processor', shadowfiend.processor.config.SERVICE_OPTS),
         ('database', shadowfiend.db.sql_opts),
+        ('service_client', shadowfiend.services.service_opts),
     ]
