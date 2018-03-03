@@ -23,10 +23,7 @@ from oslo_reports import guru_meditation_report as gmr
 from shadowfiend.common import service as oslo_service
 from shadowfiend.common import version
 
-from shadowfiend.processor.handlers import account_api
-from shadowfiend.processor.handlers import charge_api
-from shadowfiend.processor.handlers import project_api
-from shadowfiend.processor.handlers import usr_prj_api
+from shadowfiend.processor.handlers import placeholder
 from shadowfiend.processor.service import service
 
 
@@ -42,10 +39,7 @@ def main():
                         group='processor')
 
     managers = [
-        account_api.Handler(),
-        project_api.Handler(),
-        usr_prj_api.Handler(),
-        charge_api.Handler(),
+        placeholder.Handler(),
     ]
 
     server = service.ProcessorService.create(binary='shadowfiend-processor',

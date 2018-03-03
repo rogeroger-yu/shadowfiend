@@ -26,7 +26,7 @@ from shadowfiend.common import context
 from shadowfiend.common import service as rpc_service
 from shadowfiend.common import timeutils
 from shadowfiend.conductor import api as conductor_api
-from shadowfiend.processor import service
+from shadowfiend.processor.service import fetcher
 from shadowfiend.services import cinder
 from shadowfiend.services import glance
 from shadowfiend.services import neutron
@@ -53,7 +53,7 @@ service_map = {'computer': nova,
 def set_context(func):
     @functools.wraps(func)
     def handler(self, ctx):
-        ctx = context.make_admin_context(all_projects=True)
+        ctx = context.make_admin_context(all_tenants=True)
         context.set_ctx(ctx)
         func(self, ctx)
         context.set_ctx(None)
@@ -86,8 +86,8 @@ class ProcessorPeriodTasks(periodic_task.PeriodicTasks):
     def __init__(self, conf):
         super(ProcessorPeriodTasks, self).__init__(conf)
         # Fetcher init
-        self.keystone_fetcher = service.fetcher.KeystoneFetcher()
-        self.gnocchi_fetcher = service.fetcher.GnocchiFetcher()
+        self.keystone_fetcher = fetcher.KeystoneFetcher()
+        self.gnocchi_fetcher = fetcher.GnocchiFetcher()
 
         # DLM
         self.coord = coordination.get_coordinator(
@@ -153,8 +153,8 @@ class Worker(object):
         self.context = context
         self.project_id = project_id
         self.begin = begin
-        self.gnocchi_fetcher = service.fetcher.GnocchiFetcher()
-        self.keystone_fetcher = service.fetcher.KeystoneFetcher()
+        self.gnocchi_fetcher = fetcher.GnocchiFetcher()
+        self.keystone_fetcher = fetcher.KeystoneFetcher()
         self.conductor = conductor_api.API()
 
     def run(self):
