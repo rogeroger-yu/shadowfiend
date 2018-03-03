@@ -21,27 +21,17 @@ from keystoneauth1 import loading as ks_loading
 LOG = log.getLogger(__name__)
 CONF = cfg.CONF
 
-SERVICE_CLIENT_OPTS = 'service_client'
-
-service_opts = [
-    cfg.StrOpt('auth_section',
-               default="keystone_authtoken",
-               help="the auth section for each services"),
-]
-
-CONF.register_opts(service_opts, group=SERVICE_CLIENT_OPTS)
-
 
 class BaseClient(object):
     def __init__(self):
-        ks_loading.register_session_conf_options(CONF, SERVICE_CLIENT_OPTS)
-        ks_loading.register_auth_conf_options(CONF, SERVICE_CLIENT_OPTS)
+        ks_loading.register_session_conf_options(CONF, 'keystone_authtoken')
+        ks_loading.register_auth_conf_options(CONF, 'keystone_authtoken')
         self.auth = ks_loading.load_auth_from_conf_options(
             CONF,
-            SERVICE_CLIENT_OPTS)
+            'keystone_authtoken')
         self.session = ks_loading.load_session_from_conf_options(
             CONF,
-            SERVICE_CLIENT_OPTS,
+            'keystone_authtoken',
             auth=self.auth)
 
 

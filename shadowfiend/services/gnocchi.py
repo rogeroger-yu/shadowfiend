@@ -31,7 +31,6 @@ CONF.import_opt('cloudkitty_period',
                 'shadowfiend.processor.config',
                 'processor')
 
-SERVICE_CLIENT_OPTS = 'service_client'
 SHADOWFIEND_STATE_RESOURCE = 'shadowfiend_state'
 
 

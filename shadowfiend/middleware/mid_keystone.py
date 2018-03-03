@@ -25,7 +25,6 @@ from oslo_config import cfg
 from shadowfiend.client.noauth import client
 
 LOG = logging.getLogger(__name__)
-cfg.CONF.import_group("billing", "shadowfiend.middleware.base")
 
 KEYSTONE_OPTS = [
     cfg.StrOpt('initial_balance',
@@ -46,7 +45,13 @@ KEYSTONE_OPTS = [
     cfg.StrOpt('billing_admin_user_domain_name',
                default=None,
                help="Billing admin user domain name"),
+    cfg.BoolOpt('enable_billing',
+                default=False,
+                help="Open the billing or not"),
 ]
+keystone_billing_group = cfg.OptGroup(name='billing',
+                                      title='keystone billing options')
+cfg.CONF.register_group(keystone_billing_group)
 cfg.CONF.register_opts(KEYSTONE_OPTS, group="billing")
 
 UUID_RE = (r"([0-9a-f]{32}|[0-9a-f]{64}|[0-9a-z]{8}-"

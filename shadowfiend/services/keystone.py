@@ -24,8 +24,6 @@ from shadowfiend.services import BaseClient
 LOG = log.getLogger(__name__)
 CONF = cfg.CONF
 
-SERVICE_CLIENT_OPTS = 'service_client'
-
 
 class KeystoneClient(BaseClient):
     def __init__(self):

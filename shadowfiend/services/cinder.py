@@ -26,8 +26,6 @@ from shadowfiend.common.exception import NotFound
 LOG = log.getLogger(__name__)
 CONF = cfg.CONF
 
-SERVICE_CLIENT_OPTS = 'service_client'
-
 
 def drop_resource(service, resource_id):
     _volume_client = CinderClient()

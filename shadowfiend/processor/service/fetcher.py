@@ -35,7 +35,6 @@ from shadowfiend.services.keystone import KeystoneClient
 LOG = log.getLogger(__name__)
 CONF = cfg.CONF
 
-SERVICE_CLIENT_OPTS = 'service_client'
 SHADOWFIEND_STATE_RESOURCE = 'shadowfiend_state'
 SHADOWFIEND_STATE_METRIC = 'state'
 

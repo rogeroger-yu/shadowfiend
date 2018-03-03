@@ -40,7 +40,7 @@ TRANSPORT_ALIASES = {
 
 service_opts = [
     cfg.BoolOpt('allow_owe_action',
-                default=True,
+                default=False,
                 help='Enable the logic of owe'),
     cfg.StrOpt('host',
                default=socket.getfqdn(),
