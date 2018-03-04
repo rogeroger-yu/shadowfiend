@@ -16,23 +16,8 @@
 from oslo_config import cfg
 from oslo_log import log
 
-from keystoneauth1 import loading as ks_loading
-
 LOG = log.getLogger(__name__)
 CONF = cfg.CONF
-
-
-class BaseClient(object):
-    def __init__(self):
-        ks_loading.register_session_conf_options(CONF, 'keystone_authtoken')
-        ks_loading.register_auth_conf_options(CONF, 'keystone_authtoken')
-        self.auth = ks_loading.load_auth_from_conf_options(
-            CONF,
-            'keystone_authtoken')
-        self.session = ks_loading.load_session_from_conf_options(
-            CONF,
-            'keystone_authtoken',
-            auth=self.auth)
 
 
 class Resource(object):

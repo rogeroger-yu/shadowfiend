@@ -21,7 +21,7 @@ from oslo_log import log
 
 from gnocchiclient import client as gnocchi_client
 from gnocchiclient import exceptions as gexceptions
-from shadowfiend.services import BaseClient
+from keystoneauth1 import loading as ks_loading
 
 
 LOG = log.getLogger(__name__)
@@ -34,10 +34,17 @@ CONF.import_opt('cloudkitty_period',
 SHADOWFIEND_STATE_RESOURCE = 'shadowfiend_state'
 
 
-class GnocchiClient(BaseClient):
+class GnocchiClient(object):
     def __init__(self):
-        super(GnocchiClient, self).__init__()
-
+        ks_loading.register_session_conf_options(CONF, "gnocchi_client")
+        ks_loading.register_auth_conf_options(CONF, "gnocchi_client")
+        self.auth = ks_loading.load_auth_from_conf_options(
+            CONF,
+            "gnocchi_client")
+        self.session = ks_loading.load_session_from_conf_options(
+            CONF,
+            "gnocchi_client",
+            auth=self.auth)
         self.gnocchi_client = gnocchi_client.Client(
             version='1',
             session=self.session,

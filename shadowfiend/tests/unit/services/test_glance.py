@@ -13,9 +13,15 @@
 import mock
 
 from glanceclient import client as glance_client
-from shadowfiend.services import BaseClient
 from shadowfiend.services import glance
 from shadowfiend.tests.unit.db import base
+
+
+def mock_client_init(self):
+    self.glance_client = glance_client.Client(
+        version='2',
+        session=None,
+        auth_url=None)
 
 
 class mock_glance_client(object):
@@ -28,20 +34,14 @@ class mock_glance_client(object):
             pass
 
 
-def mock_base_client(self):
-    class mock_auth(object):
-        auth_url = None
-    self.session = None
-    self.auth = mock_auth()
-
-
 class TestDropGlanceResource(base.DbTestCase):
     def setUp(self):
         super(TestDropGlanceResource, self).setUp()
 
         with mock.patch.object(
-            glance_client, 'Client', mock_glance_client):
-            with mock.patch.object(BaseClient, '__init__', mock_base_client):
+            glance.GlanceClient, '__init__', mock_client_init):
+            with mock.patch.object(
+                glance_client, 'Client', mock_glance_client):
                 self.client = glance.GlanceClient()
 
     def test_delete_image(self):
@@ -50,6 +50,5 @@ class TestDropGlanceResource(base.DbTestCase):
     def test_drop_image(self):
         with mock.patch.object(
             glance_client, 'Client', mock_glance_client):
-            with mock.patch.object(BaseClient, '__init__', mock_base_client):
-                glance.drop_resource('image',
-                                     '5cb095ad-ada1-4e54-b4a0-bbdb0b54c5f9')
+            glance.drop_resource('image',
+                                 '5cb095ad-ada1-4e54-b4a0-bbdb0b54c5f9')

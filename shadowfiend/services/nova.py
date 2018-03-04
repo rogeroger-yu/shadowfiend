@@ -13,14 +13,12 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+from keystoneauth1 import loading as ks_loading
 from novaclient import client as nova_client
 from novaclient.exceptions import NotFound
 
 from oslo_config import cfg
 from oslo_log import log
-
-from shadowfiend.services import BaseClient
-
 
 LOG = log.getLogger(__name__)
 CONF = cfg.CONF
@@ -32,10 +30,17 @@ def drop_resource(service, resource_id):
         _nova_client.delete_server(resource_id)
 
 
-class NovaClient(BaseClient):
+class NovaClient(object):
     def __init__(self):
-        super(NovaClient, self).__init__()
-
+        ks_loading.register_session_conf_options(CONF, "nova_client")
+        ks_loading.register_auth_conf_options(CONF, "nova_client")
+        self.auth = ks_loading.load_auth_from_conf_options(
+            CONF,
+            "nova_client")
+        self.session = ks_loading.load_session_from_conf_options(
+            CONF,
+            "nova_client",
+            auth=self.auth)
         self.nova_client = nova_client.Client(
             version='2',
             session=self.session,

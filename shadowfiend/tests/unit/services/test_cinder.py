@@ -13,7 +13,6 @@
 import mock
 
 from cinderclient import client as cinder_client
-from shadowfiend.services import BaseClient
 from shadowfiend.services import cinder
 from shadowfiend.tests.unit.db import base
 
@@ -29,6 +28,13 @@ mock_attachment = [
         "server_id": "47d67731-8594-4021-bc08-c886068a53cf"
     }
 ]
+
+
+def mock_client_init(self):
+    self.cinder_client = cinder_client.Client(
+        version='2',
+        session=None,
+        auth_url=None)
 
 
 class Mock_Volume_Modle(object):
@@ -69,20 +75,14 @@ class mock_cinder_client(object):
             pass
 
 
-def mock_base_client(self):
-    class mock_auth(object):
-        auth_url = None
-    self.session = None
-    self.auth = mock_auth()
-
-
 class TestDropCinderResource(base.DbTestCase):
     def setUp(self):
         super(TestDropCinderResource, self).setUp()
 
         with mock.patch.object(
-            cinder_client, 'Client', mock_cinder_client):
-            with mock.patch.object(BaseClient, '__init__', mock_base_client):
+            cinder.CinderClient, '__init__', mock_client_init):
+            with mock.patch.object(
+                cinder_client, 'Client', mock_cinder_client):
                 self.client = cinder.CinderClient()
 
     def test_get_volume(self):
@@ -96,8 +96,9 @@ class TestDropCinderResource(base.DbTestCase):
 
     def test_drop_resource(self):
         with mock.patch.object(
-            cinder_client, 'Client', mock_cinder_client):
-            with mock.patch.object(BaseClient, '__init__', mock_base_client):
+            cinder.CinderClient, '__init__', mock_client_init):
+            with mock.patch.object(
+                cinder_client, 'Client', mock_cinder_client):
                 cinder.drop_resource('volume.volume',
                                      '5cb095ad-ada1-4e54-b4a0-bbdb0b54c5f9')
                 cinder.drop_resource('volume.snapshot',

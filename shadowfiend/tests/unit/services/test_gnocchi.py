@@ -13,9 +13,14 @@
 import mock
 
 from gnocchiclient import client as gnocchi_client
-from shadowfiend.services import BaseClient
 from shadowfiend.services import gnocchi
 from shadowfiend.tests.unit.db import base
+
+
+def mock_client_init(self):
+    self.gnocchi_client = gnocchi_client.Client(
+        version='2',
+        session=None)
 
 
 class mock_gnocchi_client(object):
@@ -37,20 +42,14 @@ class mock_gnocchi_client(object):
             pass
 
 
-def mock_base_client(self):
-    class mock_auth(object):
-        auth_url = None
-    self.session = None
-    self.auth = mock_auth()
-
-
 class TestDropGnocchiResource(base.DbTestCase):
     def setUp(self):
         super(TestDropGnocchiResource, self).setUp()
 
         with mock.patch.object(
-            gnocchi_client, 'Client', mock_gnocchi_client):
-            with mock.patch.object(BaseClient, '__init__', mock_base_client):
+            gnocchi.GnocchiClient, '__init__', mock_client_init):
+            with mock.patch.object(
+                gnocchi_client, 'Client', mock_gnocchi_client):
                 self.client = gnocchi.GnocchiClient()
 
     def test_init_storage_backend(self):

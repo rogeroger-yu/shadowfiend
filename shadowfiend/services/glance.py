@@ -14,11 +14,13 @@
 #    under the License.
 
 from glanceclient import client as glance_client
+from keystoneauth1 import loading as ks_loading
+
+from oslo_config import cfg
 from oslo_log import log
 
-from shadowfiend.services import BaseClient
-
 LOG = log.getLogger(__name__)
+CONF = cfg.CONF
 
 
 def drop_resource(service, resource_id):
@@ -27,10 +29,17 @@ def drop_resource(service, resource_id):
         _glance_client.delete_image(resource_id)
 
 
-class GlanceClient(BaseClient):
+class GlanceClient(object):
     def __init__(self):
-        super(GlanceClient, self).__init__()
-
+        ks_loading.register_session_conf_options(CONF, "glance_client")
+        ks_loading.register_auth_conf_options(CONF, "glance_client")
+        self.auth = ks_loading.load_auth_from_conf_options(
+            CONF,
+            "glance_client")
+        self.session = ks_loading.load_session_from_conf_options(
+            CONF,
+            "glance_client",
+            auth=self.auth)
         self.glance_client = glance_client.Client(
             version='1',
             session=self.session,

@@ -13,13 +13,19 @@
 import mock
 
 from novaclient import client as nova_client
-from shadowfiend.services import BaseClient
 from shadowfiend.services import nova
 from shadowfiend.tests.unit.db import base
 
 
+def mock_client_init(self):
+    self.nova_client = nova_client.Client(
+        version='2',
+        session=None,
+        auth_url=None)
+
+
 class mock_nova_client(object):
-    def __init__(*args, **kwargs):
+    def __init__(self, *args, **kwargs):
         pass
 
     class servers(object):
@@ -28,20 +34,14 @@ class mock_nova_client(object):
             pass
 
 
-def mock_base_client(self):
-    class mock_auth(object):
-        auth_url = None
-    self.session = None
-    self.auth = mock_auth()
-
-
 class TestDropNovaResource(base.DbTestCase):
     def setUp(self):
         super(TestDropNovaResource, self).setUp()
 
         with mock.patch.object(
-            nova_client, 'Client', mock_nova_client):
-            with mock.patch.object(BaseClient, '__init__', mock_base_client):
+            nova.NovaClient, '__init__', mock_client_init):
+            with mock.patch.object(
+                nova_client, 'Client', mock_nova_client):
                 self.client = nova.NovaClient()
 
     def test_delete_server(self):
@@ -49,7 +49,8 @@ class TestDropNovaResource(base.DbTestCase):
 
     def test_drop_server(self):
         with mock.patch.object(
-            nova_client, 'Client', mock_nova_client):
-            with mock.patch.object(BaseClient, '__init__', mock_base_client):
+            nova.NovaClient, '__init__', mock_client_init):
+            with mock.patch.object(
+                nova_client, 'Client', mock_nova_client):
                 nova.drop_resource('compute',
                                    '5cb095ad-ada1-4e54-b4a0-bbdb0b54c5f9')

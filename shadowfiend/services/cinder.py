@@ -19,7 +19,7 @@ from oslo_config import cfg
 from oslo_log import log
 
 from cinderclient import client as cinder_client
-from shadowfiend.services import BaseClient
+from keystoneauth1 import loading as ks_loading
 from shadowfiend.common.exception import NotFound
 
 
@@ -35,10 +35,17 @@ def drop_resource(service, resource_id):
         _volume_client.delete_snapshot(resource_id)
 
 
-class CinderClient(BaseClient):
+class CinderClient(object):
     def __init__(self):
-        super(CinderClient, self).__init__()
-
+        ks_loading.register_session_conf_options(CONF, "cinder_client")
+        ks_loading.register_auth_conf_options(CONF, "cinder_client")
+        self.auth = ks_loading.load_auth_from_conf_options(
+            CONF,
+            "cinder_client")
+        self.session = ks_loading.load_session_from_conf_options(
+            CONF,
+            "cinder_client",
+            auth=self.auth)
         self.cinder_client = cinder_client.Client(
             version='1',
             session=self.session,

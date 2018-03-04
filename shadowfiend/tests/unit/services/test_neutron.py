@@ -13,9 +13,15 @@
 import mock
 
 from neutronclient.v2_0 import client as neutron_client
-from shadowfiend.services import BaseClient
 from shadowfiend.services import neutron
 from shadowfiend.tests.unit.db import base
+
+
+def mock_client_init(self):
+    self.neutron_client = neutron_client.Client(
+        version='2',
+        session=None,
+        auth_url=None)
 
 
 class mock_neutron_client(object):
@@ -32,18 +38,14 @@ class mock_neutron_client(object):
         pass
 
 
-def mock_base_client(self):
-    self.session = None
-    self.auth = None
-
-
 class TestDropNeutronResource(base.DbTestCase):
     def setUp(self):
         super(TestDropNeutronResource, self).setUp()
 
         with mock.patch.object(
-            neutron_client, 'Client', mock_neutron_client):
-            with mock.patch.object(BaseClient, '__init__', mock_base_client):
+            neutron.NeutronClient, '__init__', mock_client_init):
+            with mock.patch.object(
+                neutron_client, 'Client', mock_neutron_client):
                 self.client = neutron.NeutronClient()
 
     def test_delete_loadbalancer(self):
@@ -55,8 +57,7 @@ class TestDropNeutronResource(base.DbTestCase):
     def test_drop_resource(self):
         with mock.patch.object(
             neutron_client, 'Client', mock_neutron_client):
-            with mock.patch.object(BaseClient, '__init__', mock_base_client):
-                neutron.drop_resource('ratelimit.fip',
-                                      '5cb095ad-ada1-4e54-b4a0-bbdb0b54c5f9')
-                neutron.drop_resource('loadbalancer',
-                                      '4ca045ac-cdb2-ee57-a4a0-abab0b54c5f8')
+            neutron.drop_resource('ratelimit.fip',
+                                  '5cb095ad-ada1-4e54-b4a0-bbdb0b54c5f9')
+            neutron.drop_resource('loadbalancer',
+                                  '4ca045ac-cdb2-ee57-a4a0-abab0b54c5f8')

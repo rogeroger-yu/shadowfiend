@@ -16,19 +16,26 @@
 from oslo_config import cfg
 from oslo_log import log
 
+from keystoneauth1 import loading as ks_loading
 from keystoneclient import client as ks_client
 from keystoneclient.exceptions import NotFound
-from shadowfiend.services import BaseClient
 
 
 LOG = log.getLogger(__name__)
 CONF = cfg.CONF
 
 
-class KeystoneClient(BaseClient):
+class KeystoneClient(object):
     def __init__(self):
-        super(KeystoneClient, self).__init__()
-
+        ks_loading.register_session_conf_options(CONF, "keystone_client")
+        ks_loading.register_auth_conf_options(CONF, "keystone_client")
+        self.auth = ks_loading.load_auth_from_conf_options(
+            CONF,
+            "keystone_client")
+        self.session = ks_loading.load_session_from_conf_options(
+            CONF,
+            "keystone_client",
+            auth=self.auth)
         self.ks_client = ks_client.Client(
             version='3',
             session=self.session,
