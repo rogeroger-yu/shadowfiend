@@ -111,13 +111,13 @@ class TestProcessorPeriodTasks(base.DbTestCase):
     def test_check_state_none_history(self):
         project_id = '0eed996268e34f96a30a4a0926822257'
         next_timestamp = self.Pro_Per._check_state(project_id)
-        self.assertEqual(next_timestamp, 0)
+        self.assertNotEqual(next_timestamp, 0)
 
     def test_check_state_history(self):
         project_id = '0eed996268e34f96a30a4a0926822257'
         cfg.CONF.set_override('historical_expenses', True, group='processor')
         next_timestamp = self.Pro_Per._check_state(project_id)
-        self.assertNotEqual(next_timestamp, 0)
+        self.assertEqual(next_timestamp, 0)
 
     def test_lock(self):
         project_id = '0eed996268e34f96a30a4a0926822257'

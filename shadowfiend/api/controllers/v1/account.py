@@ -185,8 +185,8 @@ class ExistAccountController(rest.RestController):
             HOOK.context.project_id)
 
         def _estimate(balance, price_per_hour, remaining_day):
-            return models.Estimate(balance=balance,
-                                   price_per_hour=price_per_hour,
+            return models.Estimate(balance=round(balance, 2),
+                                   price_per_hour=round(price_per_hour, 2),
                                    remaining_day=remaining_day)
 
         if price_per_hour == 0:

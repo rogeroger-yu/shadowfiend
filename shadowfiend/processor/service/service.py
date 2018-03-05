@@ -118,10 +118,11 @@ class ProcessorPeriodTasks(periodic_task.PeriodicTasks):
                       "Initialization from current time")
             now_ts = timeutils.utcnow_ts()
             timestamp = now_ts - (now_ts % 3600)
+            return timestamp
 
         top_stamp = self.gnocchi_fetcher.get_state(
             project_id, 'cloudkitty', 'top')
-        next_timestamp = timestamp + CONF.processor.process_period
+        next_timestamp = timestamp + CONF.processor.cloudkitty_period
         if next_timestamp < top_stamp:
             return next_timestamp
         return 0
@@ -166,15 +167,23 @@ class Worker(object):
     def run(self):
         period_cost = self.gnocchi_fetcher.get_current_consume(
             self.project_id, self.begin)
-        rate_user_id = self.keystone_fetcher.get_rate_user(self.project_id)
+        # get billing owner
+        rate_user_id = self.keystone_fetcher.get_rate_user(
+            self.project_id)
         if rate_user_id == []:
             LOG.error("There is no billing owner in you project: %s "
                       "Please contact the administrator" % self.project_id)
             raise ValueError("Not Found rate_user_id")
-        account = self.conductor.get_account(
-            self.context, rate_user_id)
+        try:
+            account = self.conductor.get_account(
+                self.context, rate_user_id)
+        except Exception as e:
+            LOG.error("Account: %s need to be registered to the "
+                      "shadowfiend's database. The reason is: %s" %
+                      (rate_user_id, e))
+            raise
         if account['owed']:
-            owed_offset = (timeutils.utcnow_ts -
+            owed_offset = (timeutils.utcnow_ts() -
                            timeutils.str2ts(account['owed_at']))
             if (owed_offset <= account['level'] * TS_DAY or
                     account['level'] == 9 or not CONF.allow_owe_action):

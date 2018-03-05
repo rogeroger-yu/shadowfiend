@@ -16,11 +16,16 @@
 """Starter script for shadowfiend-db-manage."""
 
 from oslo_config import cfg
+from shadowfiend.common import context
 from shadowfiend.db import migration
+from shadowfiend.db import api as dbapi
+from shadowfiend.db import models as db_models
+from shadowfiend.services import keystone as keystone_client
 from shadowfiend.services.gnocchi import GnocchiClient
 
 
 CONF = cfg.CONF
+dbapi = dbapi.get_instance()
 
 
 def do_version():
@@ -41,8 +46,49 @@ def do_revision():
 
 
 def do_init():
-    _gnocchi = GnocchiClient()
-    _gnocchi.init_storage_backend()
+    GnocchiClient().init_storage_backend()
+    synchronize_database()
+
+
+def synchronize_database():
+    ctx = context.make_admin_context(all_tenants=True)
+    context.set_ctx(ctx)
+
+    def _generate_group(_set, _type):
+        ids_set = []
+        for subset in _set:
+            ids_set.append(subset[_type])
+        return ids_set
+
+    rate_projects_id = _generate_group(dbapi.get_projects(ctx), 'project_id')
+    rate_accounts_id = _generate_group(dbapi.get_accounts(ctx), 'user_id')
+    ks_projects = keystone_client.get_project_list()
+    ks_users = keystone_client.get_user_list()
+
+    billing_admin = keystone_client.get_user_list(name='billing_admin')[0]
+    billing_admin_id = billing_admin.id
+    domain_id = billing_admin.domain_id
+
+    for ks_project in ks_projects:
+        if ks_project.id not in rate_projects_id:
+            dbapi.create_project(ctx,
+                                 db_models.Project(
+                                     user_id=billing_admin_id,
+                                     project_id=ks_project.id,
+                                     domain_id=domain_id,
+                                     consumption=0))
+    for ks_user in ks_users:
+        if ks_user.id not in rate_accounts_id:
+            dbapi.create_account(ctx,
+                                 db_models.Account(
+                                     user_id=ks_user.id,
+                                     domain_id=domain_id,
+                                     balance=0,
+                                     consumption=0,
+                                     level=4))
+            dbapi.charge_account(ctx, user_id=ks_user.id, value=10,
+                                 type='bonus', come_from='system')
+    context.set_ctx(None)
 
 
 def add_command_parsers(subparsers):

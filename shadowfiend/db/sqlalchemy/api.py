@@ -239,6 +239,9 @@ class Connection(api.Connection):
         model_type.updated_at = self._transfer_time2str(
             model_type.updated_at if hasattr(model_type, 'updated_at')
             else None)
+        model_type.owed_at = self._transfer_time2str(
+            model_type.owed_at if hasattr(model_type, 'owed_at')
+            else None)
         model_type.deleted_at = self._transfer_time2str(
             model_type.deleted_at if hasattr(model_type, 'deleted_at')
             else None)
@@ -258,6 +261,7 @@ class Connection(api.Connection):
                                  level=row.level,
                                  owed=row.owed,
                                  deleted=row.deleted,
+                                 owed_at=row.owed_at,
                                  created_at=row.created_at,
                                  updated_at=row.updated_at,
                                  deleted_at=row.deleted_at)
@@ -488,8 +492,9 @@ class Connection(api.Connection):
                 context,
                 sa_models.Account,
                 session=session).filter_by(user_id=user_id).one()
-            balance = account.balance - consumption
+            balance = account.balance - quantize(consumption)
             params = dict(balance=balance,
+                          consumption=quantize(consumption),
                           updated_at=datetime.datetime.utcnow())
             if balance < 0:
                 params.update(owed=True, owed_at=datetime.datetime.utcnow())
@@ -505,7 +510,7 @@ class Connection(api.Connection):
                 context, sa_models.Project, session=session).\
                 filter_by(project_id=project_id).\
                 one()
-            prj_consumption = project.consumption + consumption
+            prj_consumption = project.consumption + quantize(consumption)
             params = dict(consumption=prj_consumption,
                           updated_at=timeutils.utcnow())
             filters = params.keys()
@@ -522,7 +527,8 @@ class Connection(api.Connection):
                 filter_by(user_id=user_id).\
                 filter_by(project_id=project_id).\
                 one()
-            usr_prj_consumption = user_project.consumption + consumption
+            usr_prj_consumption = user_project.consumption + quantize(
+                consumption)
             params = dict(consumption=usr_prj_consumption,
                           updated_at=timeutils.utcnow())
             filters = params.keys()
@@ -669,18 +675,17 @@ class Connection(api.Connection):
             if active_from:
                 query = query.filter(sa_models.Project.updated_at >
                                      active_from)
-            projects = query.all()
-            return (self._row_to_db_project_model(p) for p in projects)
+            result = query.all()
         else:
             result = get_session().query(sa_models.Project).\
                 filter(sa_models.Project.project_id.in_(project_ids)).\
                 all()
 
-            projects = []
-            for r in result:
-                self._transfer(r)
-                projects.append(self._row_to_db_project_model(r).__dict__)
-            return projects
+        projects = []
+        for r in result:
+            self._transfer(r)
+            projects.append(self._row_to_db_project_model(r).__dict__)
+        return projects
 
     @oslo_db_api.wrap_db_retry(max_retries=5, retry_on_deadlock=True)
     def change_billing_owner(self, context, project_id, user_id):

@@ -68,6 +68,11 @@ def get_project_list(domain=None, name=None, user=None):
     return ks.ks_client.projects.list(domain=domain, name=name, user=user)
 
 
+def get_user_list(project=None, domain=None, **kwargs):
+    ks = KeystoneClient()
+    return ks.ks_client.users.list(project=project, domain=domain, **kwargs)
+
+
 def get_user(user_id):
     ks = KeystoneClient()
     try:

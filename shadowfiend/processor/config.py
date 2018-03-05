@@ -53,7 +53,6 @@ SERVICE_OPTS = [
     cfg.BoolOpt('historical_expenses',
                 default=False,
                 help="Whether to record the historical cost"),
-
 ]
 
 

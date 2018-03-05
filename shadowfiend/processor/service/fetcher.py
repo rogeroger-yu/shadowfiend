@@ -97,6 +97,7 @@ class KeystoneFetcher(KeystoneClient):
         role_assign = getattr(self.ks_client.role_assignments, 'list')(
             **{'role': role_id,
                'project': project_id})
+
         return (role_assign[0].user['id'] if role_assign != [] else
                 role_assign)
 
@@ -157,7 +158,7 @@ class GnocchiFetcher(GnocchiClient):
         if not resources:
             # NOTE(sheeprine): We don't have the user id information and we are
             # doing rating on a per project basis. Put garbage in it
-            LOG.warning("There is no % state resource" % state_type)
+            LOG.warning("There is no %s state resource" % state_type)
         else:
             state_resource_id = resources[0]['id']
             try:
