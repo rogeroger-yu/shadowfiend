@@ -94,6 +94,11 @@ class ProcessorPeriodTasks(periodic_task.PeriodicTasks):
             CONF.processor.coordination_url,
             str(uuid.uuid4()).encode('ascii'))
         self.coord.start()
+        self.conductor = conductor_api.API()
+
+        self.tools = {'conductor': self.conductor,
+                      'gnocchi_fetcher': self.gnocchi_fetcher,
+                      'keystone_fetcher': self.keystone_fetcher}
 
     def _lock(self, project_id):
         lock_name = b"shadowfiend-" + str(project_id).encode('ascii')
@@ -136,7 +141,7 @@ class ProcessorPeriodTasks(periodic_task.PeriodicTasks):
                     if not begin:
                         rate_projects.remove(rate_project)
                     else:
-                        worker = Worker(ctx, rate_project, begin)
+                        worker = Worker(ctx, rate_project, begin, self.tools)
                         worker.run()
                     lock.release()
                 self.coord.heartbeat()
@@ -149,13 +154,14 @@ class ProcessorPeriodTasks(periodic_task.PeriodicTasks):
 
 
 class Worker(object):
-    def __init__(self, context, project_id, begin):
+    def __init__(self, context, project_id, begin, tools):
         self.context = context
         self.project_id = project_id
         self.begin = begin
-        self.gnocchi_fetcher = fetcher.GnocchiFetcher()
-        self.keystone_fetcher = fetcher.KeystoneFetcher()
-        self.conductor = conductor_api.API()
+
+        self.conductor = tools['conductor']
+        self.gnocchi_fetcher = tools['gnocchi_fetcher']
+        self.keystone_fetcher = tools['keystone_fetcher']
 
     def run(self):
         period_cost = self.gnocchi_fetcher.get_current_consume(

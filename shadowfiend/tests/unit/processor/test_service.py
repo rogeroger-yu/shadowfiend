@@ -14,7 +14,7 @@ import mock
 
 from oslo_config import cfg
 from shadowfiend.common import context
-from shadowfiend.conductor.api import API as conductor_api
+from shadowfiend.conductor import api as conductor_api
 from shadowfiend.processor.service import service
 from shadowfiend.processor.service import fetcher
 from shadowfiend.tests.unit.conductor import utils as conductor_utils
@@ -39,36 +39,51 @@ class TestWorker(base.DbTestCase):
             project_id=project.project_id)
 
         class mock_keystone_fetcher(object):
-            def get_rate_user(self, *args):
+            @classmethod
+            def get_rate_user(*args):
                 return account.user_id
 
         class mock_gnocchi_fetcher(object):
-            def get_resources(self, *args):
+            @classmethod
+            def get_resources(*args):
                 return []
 
-            def get_current_consume(self, *args):
+            @classmethod
+            def get_current_consume(*args):
                 return 0
 
-            def set_state(self, *args):
+            @classmethod
+            def set_state(*args):
                 pass
+
+        class mock_conductor_api(object):
+            @classmethod
+            def get_account(*args):
+                return conductor_utils.get_test_account(*args)
+
+            @classmethod
+            def update_account(*args, **kwargs):
+                return conductor_utils.update_test_account(*args, **kwargs)
+
+        tools = {'conductor': mock_conductor_api,
+                 'gnocchi_fetcher': mock_gnocchi_fetcher,
+                 'keystone_fetcher': mock_keystone_fetcher}
 
         with mock.patch.object(
             fetcher, 'KeystoneFetcher', mock_keystone_fetcher):
             with mock.patch.object(
                 fetcher, 'GnocchiFetcher', mock_gnocchi_fetcher):
-                self.Worker = service.Worker(ctx, project.project_id, 0)
+                with mock.patch.object(
+                    conductor_api, 'API', mock_conductor_api):
+                    self.Worker = service.Worker(ctx, project.project_id,
+                                                 0, tools)
 
     def test_owed_action(self):
         project_id = '0eed996268e34f96a30a4a0926822257'
         self.Worker.owed_action(project_id)
 
     def test_run(self):
-        with mock.patch.object(
-            conductor_api, 'get_account', conductor_utils.get_test_account):
-            with mock.patch.object(conductor_api,
-                                   'update_account',
-                                   conductor_utils.update_test_account):
-                self.Worker.run()
+        self.Worker.run()
 
 
 class TestProcessorPeriodTasks(base.DbTestCase):
